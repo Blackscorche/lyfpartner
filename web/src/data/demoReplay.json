@@ -1,0 +1,174 @@
+[
+  {
+    "timeMs": 0,
+    "type": "call.started",
+    "data": {
+      "session_id": "sess_demo_live_001",
+      "caller_id": "+2348000000001",
+      "channel": "telephony",
+      "caller_name": "Aminu Bello Kano"
+    }
+  },
+  {
+    "timeMs": 1200,
+    "type": "agent.reply",
+    "data": {
+      "speaker": "assistant",
+      "language": "ha",
+      "text": "Sannu! Barka da zuwa Lyfpatner. Don Allah ku fadi lambar sirri ku.",
+      "stage": "TTS",
+      "latencyMs": 180
+    }
+  },
+  {
+    "timeMs": 3500,
+    "type": "asr.final",
+    "data": {
+      "speaker": "caller",
+      "language": "ha",
+      "text": "Daya biyu uku hudu (1234)",
+      "confidence": 0.98,
+      "latencyMs": 240
+    }
+  },
+  {
+    "timeMs": 4200,
+    "type": "auth.update",
+    "data": {
+      "pin_verified": true,
+      "voice_match_score": 0.96,
+      "auth_level": "basic",
+      "account_id": "acc_aminu_001",
+      "status": "UNLOCKED"
+    }
+  },
+  {
+    "timeMs": 5200,
+    "type": "agent.reply",
+    "data": {
+      "speaker": "assistant",
+      "language": "ha",
+      "text": "An tabbatar da lambar sirri. Yaya zan iya taimaka muku?",
+      "stage": "TTS",
+      "latencyMs": 160
+    }
+  },
+  {
+    "timeMs": 7500,
+    "type": "asr.final",
+    "data": {
+      "speaker": "caller",
+      "language": "ha",
+      "text": "Ina son duba kudi na",
+      "confidence": 0.96,
+      "latencyMs": 210
+    }
+  },
+  {
+    "timeMs": 8200,
+    "type": "tool.call",
+    "data": {
+      "tool": "check_balance",
+      "args": { "account_id": "acc_aminu_001" },
+      "result": { "balance_naira": 250000, "currency": "NGN" },
+      "latencyMs": 45
+    }
+  },
+  {
+    "timeMs": 9500,
+    "type": "agent.reply",
+    "data": {
+      "speaker": "assistant",
+      "language": "ha",
+      "text": "Kudin ku a asusun banki Naira dubu dari biyu da hamsin (₦250,000.00) ne.",
+      "stage": "TTS",
+      "latencyMs": 190
+    }
+  },
+  {
+    "timeMs": 13000,
+    "type": "asr.final",
+    "data": {
+      "speaker": "caller",
+      "language": "ha",
+      "text": "Tura Naira dubu biyar zuwa Musa",
+      "confidence": 0.95,
+      "latencyMs": 230
+    }
+  },
+  {
+    "timeMs": 14000,
+    "type": "tool.call",
+    "data": {
+      "tool": "quote_transfer",
+      "args": { "beneficiary": "Musa Bello", "amount_kobo": 500000 },
+      "result": {
+        "confirmation_token": "tok_quote_8921",
+        "beneficiary_name": "Musa Bello",
+        "account_number": "2045678901",
+        "bank": "First Bank",
+        "amount_naira": 5000,
+        "fee_naira": 10
+      },
+      "latencyMs": 52
+    }
+  },
+  {
+    "timeMs": 15200,
+    "type": "agent.reply",
+    "data": {
+      "speaker": "assistant",
+      "language": "ha",
+      "text": "Kuna son tura Naira 5,000 ga Musa Bello a First Bank. In tura?",
+      "stage": "TTS",
+      "latencyMs": 175
+    }
+  },
+  {
+    "timeMs": 18000,
+    "type": "asr.final",
+    "data": {
+      "speaker": "caller",
+      "language": "ha",
+      "text": "Bee ne, tura shi",
+      "confidence": 0.99,
+      "latencyMs": 190
+    }
+  },
+  {
+    "timeMs": 18800,
+    "type": "transfer.confirmed",
+    "data": {
+      "transaction_id": "tx_nip_991823",
+      "reference": "NIP-20261114-8831",
+      "recipient": "Musa Bello",
+      "bank": "First Bank",
+      "account_number": "2045678901",
+      "amount_naira": 5000,
+      "fee_naira": 10,
+      "balance_after": 244990,
+      "status": "SETTLED"
+    }
+  },
+  {
+    "timeMs": 19600,
+    "type": "agent.reply",
+    "data": {
+      "speaker": "assistant",
+      "language": "ha",
+      "text": "An tura Naira 5,000 ga Musa Bello cikin nasara. An aiko muku da sakon SMS.",
+      "stage": "TTS",
+      "latencyMs": 180
+    }
+  },
+  {
+    "timeMs": 23000,
+    "type": "call.ended",
+    "data": {
+      "duration_seconds": 23,
+      "turn_count": 5,
+      "outcome": "completed",
+      "sms_receipt": "Lyfpatner Debit: NGN 5,000.00 to Musa Bello. Ref: NIP-20261114-8831. Bal: NGN 244,990.00"
+    }
+  }
+]

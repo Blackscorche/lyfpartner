@@ -1,0 +1,153 @@
+services:
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: python -m uvicorn services.gateway.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=production
+      - SERVICE_KEY=lyfpartner-secret-service-key-2026
+      - DATABASE_URL=sqlite+aiosqlite:///./lyfpartner.db
+      - ASR_URL=http://asr-service:8001
+      - AGENT_URL=http://agent-service:8002
+      - TTS_URL=http://tts-service:8003
+      - AUTH_URL=http://auth-service:8004
+      - BANK_URL=http://bank-service:8005
+      - KYC_URL=http://kyc-service:8006
+      - SUPPORT_URL=http://support-service:8007
+      - ADMIN_URL=http://admin-service:8008
+      - NOTIFY_URL=http://notify-service:8009
+    volumes:
+      - shared-data:/app/data
+    depends_on:
+      - asr-service
+      - agent-service
+      - bank-service
+
+  asr-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.asr
+    ports:
+      - "8001:8001"
+    environment:
+      - ASR_PROVIDER=mock # or natlas with HF_TOKEN
+      - HF_TOKEN=${HF_TOKEN}
+      - SERVICE_KEY=lyfpartner-secret-service-key-2026
+
+  agent-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: python -m uvicorn services.agent.main:app --host 0.0.0.0 --port 8002
+    ports:
+      - "8002:8002"
+    environment:
+      - LLM_PROVIDER=mock
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - BANK_URL=http://bank-service:8005
+      - SUPPORT_URL=http://support-service:8007
+      - NOTIFY_URL=http://notify-service:8009
+      - SERVICE_KEY=lyfpartner-secret-service-key-2026
+
+  tts-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: python -m uvicorn services.tts.main:app --host 0.0.0.0 --port 8003
+    ports:
+      - "8003:8003"
+    environment:
+      - TTS_PROVIDER=mock
+      - SPITCH_API_KEY=${SPITCH_API_KEY}
+      - SERVICE_KEY=lyfpartner-secret-service-key-2026
+
+  auth-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: python -m uvicorn services.auth.main:app --host 0.0.0.0 --port 8004
+    ports:
+      - "8004:8004"
+    environment:
+      - VOICE_VERIFY_PROVIDER=mock
+      - SERVICE_KEY=lyfpartner-secret-service-key-2026
+    volumes:
+      - shared-data:/app/data
+
+  bank-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: python -m uvicorn services.bank.main:app --host 0.0.0.0 --port 8005
+    ports:
+      - "8005:8005"
+    environment:
+      - BANK_PROVIDER=mock
+      - SERVICE_KEY=lyfpartner-secret-service-key-2026
+    volumes:
+      - shared-data:/app/data
+
+  kyc-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: python -m uvicorn services.kyc.main:app --host 0.0.0.0 --port 8006
+    ports:
+      - "8006:8006"
+    environment:
+      - KYC_PROVIDER=mock
+      - SERVICE_KEY=lyfpartner-secret-service-key-2026
+    volumes:
+      - shared-data:/app/data
+
+  support-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: python -m uvicorn services.support.main:app --host 0.0.0.0 --port 8007
+    ports:
+      - "8007:8007"
+    environment:
+      - SERVICE_KEY=lyfpartner-secret-service-key-2026
+    volumes:
+      - shared-data:/app/data
+
+  admin-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: python -m uvicorn services.admin.main:app --host 0.0.0.0 --port 8008
+    ports:
+      - "8008:8008"
+    environment:
+      - SERVICE_KEY=lyfpartner-secret-service-key-2026
+    volumes:
+      - shared-data:/app/data
+
+  notify-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: python -m uvicorn services.notify.main:app --host 0.0.0.0 --port 8009
+    ports:
+      - "8009:8009"
+    environment:
+      - SMS_PROVIDER=mock
+      - AT_API_KEY=${AT_API_KEY}
+      - AT_USERNAME=${AT_USERNAME}
+      - SERVICE_KEY=lyfpartner-secret-service-key-2026
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    depends_on:
+      - gateway
+
+volumes:
+  shared-data:

@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+env/
+venv/
+*.db
+*.sqlite3
+
+# Node / Web
+node_modules/
+.npm
+web/node_modules/
+web/dist/
+
+# Tests & Artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+tests/audio_samples/*.wav
+
+# Environment
+.env
