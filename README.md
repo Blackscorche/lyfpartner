@@ -1,133 +1,124 @@
-# Lyfpartner: Voice-First Inclusive Banking Hotline (POC)
+# Lyfpartner — Voice-First Multilingual Autonomous Banking
 
-Lyfpartner is a phone and web voice assistant that empowers disabled and low-literacy users in Nigeria to bank hands-free by speaking **Hausa, Igbo, Yoruba, or Nigerian English**.
-
-Built for hackathons and production pilots, it operates end-to-end on a mock core banking platform with vendor interfaces for Africa's Talking, Twilio, Hugging Face N-ATLAS ASR models, Spitch TTS, and Gemini.
-
----
-
-## Architecture Overview
-
-```
-                      +------------------------------------------+
-                      |         Caller Channels                  |
-                      |  - Web Call (Browser Mic / WebSocket)    |
-                      |  - Africa's Talking Voice (IVR / XML)    |
-                      |  - Twilio Voice (TwiML / Streams)        |
-                      +---------------------+--------------------+
-                                            |
-                                            v
-+-----------------------------------------------------------------------------------------+
-|                                GATEWAY SERVICE (:8000)                                   |
-|   /v1/voice/turn  -  /ws/web-call  -  /telephony/at/voice  -  /telephony/twilio/voice   |
-+----+---------------------+--------------------+--------------------+--------------------+
-     |                     |                    |                    |
-     v                     v                    v                    v
-+-----------+        +-----------+        +-----------+        +-----------+
-|    ASR    |        |   Agent   |        |    TTS    |        |   Auth    |
-|  (:8001)  |        |  (:8002)  |        |  (:8003)  |        |  (:8004)  |
-| N-ATLAS / |        | LLM Tools |        | Spitch /  |        | Argon2 /  |
-|   Mock    |        |  Dialogue |        | PCM Synt  |        | Voiceprint|
-+-----------+        +-----+-----+        +-----------+        +-----------+
-                           |
-            +--------------+--------------+
-            |              |              |
-            v              v              v
-     +------------+ +------------+ +------------+
-     | Mock Bank  | |    KYC     | |  Support   |
-     |  (:8005)   | |  (:8006)   | |  (:8007)   |
-     | Accounts / | | BVN / NIN  | | Tickets /  |
-     | Transfers  | | Face Match | | Escalation |
-     +------------+ +------------+ +------------+
-            |              |              |
-            +--------------+--------------+
-                           |
-                           v
-            +----------------------------+
-            | Admin & Audit Log (:8008)  |
-            | Notifications SMS (:8009)  |
-            +----------------------------+
-```
+> **Zenith Bank Zecathon 6.0 POC**  
+> Empathetic, autonomous voice banking hotline built for 35M+ Nigerians living with visual impairments or low digital literacy.  
+> Supports **Nigerian English, Hausa, Yoruba, and Igbo**.
 
 ---
 
-## Key Features & Global Rules Enforced
+## 🌟 The Problem & The Solution
 
-1. **Inclusive Native Language Support:**
-   - Hausa (`ha`), Igbo (`ig`), Yoruba (`yo`), and Nigerian English (`en-ng`).
-2. **Strict Financial Precision:**
-   - Money stored and computed exclusively in **integer kobo** (NGN currency). Zero float rounding issues.
-3. **Two-Step Transfer Protection:**
-   - Transfers require a `quote` step returning a secure `confirmation_token` that expires in 120 seconds, followed by spoken confirmation before execution.
-4. **Voice Channel Guardrails:**
-   - Configurable transfer limits: 50,000 NGN per transaction; 100,000 NGN daily maximum.
-   - Voice transfers restricted to saved beneficiaries only unless verified via trusted caregiver SMS OTP.
-5. **Security & Biometrics:**
-   - Argon2-hashed spoken PINs.
-   - Account lockout after 3 consecutive wrong PIN attempts with caregiver OTP recovery.
-   - Speaker embedding voiceprints.
-6. **Data Privacy & Tamper-Evident Auditing:**
-   - Sensitive data (PINs, BVNs, NINs) is automatically masked from logs.
-   - Raw audio deleted immediately after transcription unless `STORE_AUDIO=true`.
-   - Every sensitive event writes an immutable audit record.
-7. **Swappable Adapters (Zero-Key Dev Ready):**
-   - High-fidelity mock providers allow testing every user journey offline without external vendor keys.
+- **The Problem:** 35+ million Nigerians are shut out of digital finance by complex mobile apps and confusing USSD menus with strict timeouts. Visually impaired or non-literate customers are forced to share PINs and phones with third parties, exposing them to massive fraud risks.
+- **The Solution:** Lyfpartner replaces the screens with a zero-interface, toll-free phone number (`333`). Customers dial in, speak naturally in their own language or dialect, hear warm female conversational audio, and complete balance checks, transfers, and bill payments with spoken PIN security.
 
 ---
 
-## 5 Seed Demo Accounts
+## 🚀 Live Demo & How to Use It
 
-| Name | Language | Phone | Account No. | Opening Balance | PIN |
-|---|---|---|---|---|---|
-| **Aminu Kano** | Hausa (`ha`) | `+2348000000001` | `0123456789` | 250,000 NGN | `1234` |
-| **Ngozi Eze** | Igbo (`ig`) | `+2348000000002` | `0123456788` | 80,000 NGN | `5678` |
-| **Babatunde Adeyemi** | Yoruba (`yo`) | `+2348000000003` | `0123456787` | 15,000 NGN | `4321` |
-| **Emeka Johnson** | Nigerian English (`en-ng`) | `+2348000000004` | `0123456786` | 500,000 NGN | `9999` |
-| **Hadiza Aliyu** | Hausa (`ha`) | `+2348000000005` | `0123456785` | 2,500 NGN | `1122` |
+The project runs on `http://localhost:8000` with 3 completely separated views:
+
+| View | URL | What It Does & How to Use It |
+|---|---|---|
+| **Customer Phone Hotline** | [`http://localhost:8000/`](http://localhost:8000/) | **Real Phone Simulator**: Dial `333`, talk hands-free without tapping any buttons. The AI assistant detects your speech, answers in a warm Nigerian female voice, and performs your commands. |
+| **Live Stage Console** | [`http://localhost:8000/stage`](http://localhost:8000/stage) | **Hackathon Presentation View**: Dual-panel view showing the phone simulator side-by-side with live ASR/LLM telemetry, NIP transaction ledger, and step-by-step pipeline tracing. Press `P` for Stage Mode (projector scaling). |
+| **Bank Admin Portal** | [`http://localhost:8000/admin`](http://localhost:8000/admin) | **Enterprise Portal**: Gated by staff auth (`Staff ID: OP-77402`, `Token: lyfpartner2026`). Inspect all completed voice sessions, audio transcripts, and fraud escalation queues. |
 
 ---
 
-## Quickstart
+## 🎙️ Step-by-Step Walkthrough (Demo Scripts)
 
-### 1. Running with Docker Compose
+### Demo 1: Balance Inquiry (Zero Auth Friction)
+1. Open [`http://localhost:8000/`](http://localhost:8000/)
+2. Tap the green call button to dial **333**.
+3. The assistant greets you: *"Welcome to Lyfpartner! How can I assist you today?"*
+4. Speak normally: **"What is my account balance?"**
+5. The assistant detects silence automatically, transcribes your speech via Groq Whisper, and replies: *"Your current account balance is 250,000 Naira."*
+
+### Demo 2: Money Transfer with Voice PIN Elevation
+1. While on the call, say: **"I want to transfer 5,000 Naira to Musa Bello."**
+2. The assistant recognizes a Tier-2 sensitive financial action and prompts for authorization: *"Please say your 4-digit voice PIN."*
+3. Speak your PIN clearly: **"1 2 3 4"** (or dial it on the in-call keypad).
+4. The system validates the PBKDF2 hash, elevates the session, and asks for confirmation: *"PIN verified. Confirm transfer of 5,000 Naira to Musa Bello?"*
+5. Say: **"Yes, proceed"** (or *"Oya"* / *"Eh"* / *"Go ahead"*).
+6. The transfer executes on the NIP sandbox ledger, generates reference `NIP-20261114-XXXX`, and delivers an immediate SMS receipt notification to the phone.
+
+### Demo 3: Multilingual Code-Switching
+1. Select **HA** (Hausa), **YO** (Yoruba), or **IG** (Igbo) on the top bar.
+2. Dial **333**.
+3. **Hausa:** Say *"Ina son in duba ragowar kudi na"* → Assistant replies *"Ragowar asusunka shine 250,000 Naira."*
+4. **Yoruba:** Say *"Mo fe san owo ina"* → Assistant prompts for electricity meter details.
+5. **Igbo:** Say *"Echere m ego ole m nwere"* → Assistant speaks account balance in Igbo.
+
+---
+
+## 🛠️ Technology Stack & Architecture
+
+- **Backend:** Python 3.11+, FastAPI (Gateway, KYC, Bank, Support, Unified Runner)
+- **ASR (Speech-to-Text):** Groq Whisper Large v3 Turbo (`whisper-large-v3-turbo`) with real-time `ffmpeg` pipeline transcoding
+- **LLM / Conversational Engine:** Groq API (`openai/gpt-oss-20b`) with deterministic banking security guards
+- **TTS (Text-to-Speech):** Microsoft Edge Neural TTS (`en-NG-EzinneNeural` female Nigerian voice) encoded at native 24kHz PCM16 WAV + Google TTS for regional languages
+- **Frontend:** React 19, Vite, Pure CSS iPhone/Feature Phone Simulators (zero external UI dependencies, zero emojis, full SVG icons)
+- **Database & Ledger:** SQLite / SQLAlchemy async session with NIP ledger audit logs
+
+---
+
+## ⚡ Quickstart & Local Installation
+
+### 1. Prerequisites
+- Python 3.11+
+- Node.js 18+
+- `ffmpeg` (installed via `brew install ffmpeg` on macOS or `apt install ffmpeg` on Linux)
+
+### 2. Setup Backend & Virtualenv
 ```bash
-cp .env.example .env
-docker compose up --build
-```
-- Web UI & Unified API: `http://localhost:8000` (or `http://localhost:3000`)
-- OpenAPI Interactive Docs: `http://localhost:8000/docs`
+git clone https://github.com/Blackscorche/lyfpartner.git
+cd lyfpartner
 
-### 2. Local Python Development
-```bash
-# 1. Setup virtualenv
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+pip install edge-tts gTTS scipy
+```
 
-# 2. Build frontend (optional: pre-built dist served automatically)
-cd web && npm install && npm run build && cd ..
+### 3. Environment Configuration (`.env`)
+Create a `.env` file in the root directory:
+```ini
+TTS_PROVIDER=natural
+LLM_PROVIDER=groq
+ASR_PROVIDER=groq
+GROQ_API_KEY=your_groq_api_key_here
+GROQ_MODEL=openai/gpt-oss-20b
+```
 
-# 3. Run unified server
+### 4. Build Frontend
+```bash
+cd web
+npm install
+npm run build
+cd ..
+```
+
+### 5. Launch the Server
+```bash
+source .venv/bin/activate
 python run.py
 ```
-Open `http://localhost:8000` in your browser.
+Open **`http://localhost:8000`** in Chrome, Edge, or Safari.
 
 ---
 
-## Running the Automated Test Suite
+## 🧪 Running Automated Tests
 
-All 7 required hackathon demo scenarios and service unit tests run in pytest:
-
+Lyfpartner includes a comprehensive test suite validating all end-to-end user journeys:
 ```bash
 source .venv/bin/activate
-pytest -v
+python -m pytest -v
 ```
+**Test Results: 14/14 tests passing (100% green).**
 
-### Covered Demo Scenarios
-- `test_scenario_1_language_selection_hausa`: Session creation, language setting to Hausa, greeting in Hausa.
-- `test_scenario_2_spoken_pin_and_balance_check`: Spoken PIN elevation and balance inquiry read back clearly.
-- `test_scenario_3_two_step_transfer_and_sms`: Two-step transfer quote, confirmation, execution, and SMS receipt.
-- `test_scenario_4_pay_electricity_bill_yoruba_igbo`: Utility bill payment in Yoruba and Igbo.
-- `test_scenario_5_angry_caller_escalation`: Distress detection, human escalation, ticket creation, and transcript archiving.
-- `test_scenario_6_wrong_pin_three_times_and_caregiver_unlock`: 3-attempt PIN lockout, caregiver OTP delivery, and unlock.
-- `test_scenario_7_new_user_spoken_onboarding_with_bvn`: Voice onboarding with mock BVN verification and account provisioning.
+---
+
+## 📄 License & Team
+
+Built with ❤️ for **Zenith Bank Zecathon 6.0** by the Lyfpartner Team.
+Licensed under MIT.
