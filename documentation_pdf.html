@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lyfpartner — Autonomous Voice Banking Hotline Architecture</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+  @page {
+    size: A4;
+    margin: 18mm 16mm 20mm 16mm;
+    @bottom-right {
+      content: counter(page);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 8pt;
+      color: #71717a;
+    }
+  }
+
+  * {
+    box-sizing: border-box;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  body {
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    color: #18181b;
+    background: #ffffff;
+    line-height: 1.55;
+    font-size: 9.8pt;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* Header Banner */
+  .hero-header {
+    background: linear-gradient(135deg, #0a0f1d 0%, #151f38 60%, #0d281e 100%);
+    color: #ffffff;
+    padding: 26px 30px;
+    border-radius: 14px;
+    margin-bottom: 24px;
+    box-shadow: 0 10px 25px -5px rgba(10, 15, 29, 0.3);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .hero-header::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -20%;
+    width: 300px;
+    height: 300px;
+    background: radial-gradient(circle, rgba(16, 185, 129, 0.15) 0%, transparent 70%);
+    border-radius: 50%;
+  }
+
+  .badge-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 7.5pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 3px 9px;
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #e4e4e7;
+  }
+
+  .badge.green {
+    background: rgba(16, 185, 129, 0.2);
+    border-color: rgba(16, 185, 129, 0.4);
+    color: #34d399;
+  }
+
+  h1 {
+    font-size: 22pt;
+    font-weight: 800;
+    letter-spacing: -0.6px;
+    margin: 0 0 6px 0;
+    color: #ffffff;
+  }
+
+  .tagline {
+    font-size: 11pt;
+    font-weight: 400;
+    color: #cbd5e1;
+    margin: 0;
+    max-width: 90%;
+  }
+
+  /* Grid Layouts */
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-bottom: 18px;
+  }
+
+  .grid-3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+
+  /* Cards */
+  .card {
+    background: #fafafa;
+    border: 1px solid #e4e4e7;
+    border-radius: 10px;
+    padding: 14px 16px;
+    break-inside: avoid;
+  }
+
+  .card-highlight {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+  }
+
+  .card-dark {
+    background: #09090b;
+    color: #fafafa;
+    border: 1px solid #27272a;
+  }
+
+  .card-title {
+    font-size: 10.5pt;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0 0 6px 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .card-dark .card-title {
+    color: #f4f4f5;
+  }
+
+  .card-p {
+    font-size: 8.8pt;
+    color: #52525b;
+    margin: 0;
+    line-height: 1.5;
+  }
+
+  .card-dark .card-p {
+    color: #a1a1aa;
+  }
+
+  /* Section Headers */
+  h2 {
+    font-size: 13pt;
+    font-weight: 800;
+    color: #0f172a;
+    border-bottom: 1.5px solid #e2e8f0;
+    padding-bottom: 6px;
+    margin: 22px 0 12px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    letter-spacing: -0.3px;
+    break-after: avoid;
+  }
+
+  h2::before {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 16px;
+    background: #059669;
+    border-radius: 3px;
+  }
+
+  h3 {
+    font-size: 10.5pt;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 14px 0 6px 0;
+  }
+
+  /* Tables */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0 18px 0;
+    font-size: 8.8pt;
+    break-inside: avoid;
+  }
+
+  th {
+    background: #f1f5f9;
+    color: #0f172a;
+    font-weight: 700;
+    text-align: left;
+    padding: 8px 10px;
+    border-bottom: 2px solid #cbd5e1;
+    font-size: 8.5pt;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+  }
+
+  td {
+    padding: 8px 10px;
+    border-bottom: 1px solid #e2e8f0;
+    color: #334155;
+    vertical-align: top;
+  }
+
+  tr:nth-child(even) td {
+    background: #f8fafc;
+  }
+
+  /* Code & Pre */
+  code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8pt;
+    background: #f1f5f9;
+    color: #0f172a;
+    padding: 2px 5px;
+    border-radius: 4px;
+    border: 1px solid #e2e8f0;
+  }
+
+  .code-block {
+    background: #0f172a;
+    color: #e2e8f0;
+    padding: 12px 14px;
+    border-radius: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8pt;
+    line-height: 1.45;
+    margin: 10px 0;
+    overflow: hidden;
+    break-inside: avoid;
+  }
+
+  /* Workflow Step Pills */
+  .step-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 12px 0;
+  }
+
+  .step-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 10px 12px;
+    break-inside: avoid;
+  }
+
+  .step-num {
+    background: #059669;
+    color: #ffffff;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9pt;
+    font-weight: 800;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .step-content {
+    flex: 1;
+  }
+
+  .step-title {
+    font-size: 9.2pt;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0 0 2px 0;
+  }
+
+  .step-desc {
+    font-size: 8.5pt;
+    color: #64748b;
+    margin: 0;
+  }
+
+  .page-break {
+    page-break-before: always;
+  }
+
+  .footer-note {
+    margin-top: 24px;
+    padding-top: 12px;
+    border-top: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: space-between;
+    font-size: 8pt;
+    color: #94a3b8;
+    font-family: 'JetBrains Mono', monospace;
+  }
+</style>
+</head>
+<body>
+
+  <!-- PAGE 1: COVER & ARCHITECTURE OVERVIEW -->
+  <div class="hero-header">
+    <div class="badge-row">
+      <span class="badge green">ZENITH BANK ZECATHON 6.0</span>
+      <span class="badge">PROOF OF CONCEPT</span>
+      <span class="badge">NIP COMPLIANT</span>
+    </div>
+    <h1>Lyfpartner</h1>
+    <p class="tagline">Voice-First, Multilingual Autonomous Banking Hotline for 35M+ Excluded Nigerians</p>
+  </div>
+
+  <div class="grid-2">
+    <div class="card card-highlight">
+      <div class="card-title">🎯 The Exclusion Gap</div>
+      <p class="card-p">
+        Over 35 million Nigerians living with visual impairments or low digital literacy are excluded by text-heavy USSD menus and visually demanding mobile apps. Customers are forced to share PINs with third parties, creating massive fraud vulnerability.
+      </p>
+    </div>
+    <div class="card">
+      <div class="card-title">💡 The Autonomous Voice Solution</div>
+      <p class="card-p">
+        A zero-interface, toll-free banking hotline (<b>333</b>). Customers dial in, speak naturally in <b>Hausa, Yoruba, Igbo, or Nigerian English</b>, receive warm female conversational voice feedback, and conduct banking with zero screens.
+      </p>
+    </div>
+  </div>
+
+  <h2>1. System Architecture & Component Flow</h2>
+  <p class="card-p" style="margin-bottom: 12px;">
+    Lyfpartner couples real-time telephony stream decoding with Groq-accelerated AI models and a deterministic NIP banking core.
+  </p>
+
+  <div class="grid-3">
+    <div class="card card-dark">
+      <div class="badge" style="margin-bottom: 6px;">VOICE ACTIVITY DETECTION</div>
+      <div class="card-title">Hands-Free VAD</div>
+      <p class="card-p">
+        Continuous client-side Web Audio AnalyserNode tracks room ambient sound and auto-detects speech completion after 950ms of silence. No buttons needed.
+      </p>
+    </div>
+    <div class="card card-dark">
+      <div class="badge" style="margin-bottom: 6px;">ASR & TRANSCRIPTION</div>
+      <div class="card-title">Groq Whisper Large v3</div>
+      <p class="card-p">
+        Ultra-low latency speech transcription. Incoming Opus/WebM audio is piped directly through <code>ffmpeg</code> into 16kHz mono WAV for &lt;300ms transcription.
+      </p>
+    </div>
+    <div class="card card-dark">
+      <div class="badge" style="margin-bottom: 6px;">NEURAL TTS</div>
+      <div class="card-title">Native 24kHz Audio</div>
+      <p class="card-p">
+        Microsoft Edge Neural TTS (<code>en-NG-EzinneNeural</code>) with <code>rate=+8%</code> encoded at native 24kHz PCM16 WAV. Eliminates slow-motion pitch distortion.
+      </p>
+    </div>
+  </div>
+
+  <h2>2. The Three Independent Applications</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Application</th>
+        <th>Route</th>
+        <th>Interface Type</th>
+        <th>Primary Purpose & Features</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><b>Customer Phone Simulator</b></td>
+        <td><code>http://localhost:8000/</code></td>
+        <td>Pure CSS Smartphone Mockup (340px)</td>
+        <td>Customer-facing experience. Auto hands-free calling to 333, live audio waveform, Dynamic Island status, and keypad fallback.</td>
+      </tr>
+      <tr>
+        <td><b>Live Stage Console</b></td>
+        <td><code>http://localhost:8000/stage</code></td>
+        <td>Dual-Panel Telemetry Suite (16:9)</td>
+        <td>Hackathon presentation view. Real-time pipeline step tracing (VAD &rarr; Whisper &rarr; LLM &rarr; TTS), live NIP ledger feed, and Stage Mode projector scaling (<code>P</code> key).</td>
+      </tr>
+      <tr>
+        <td><b>Bank Admin Portal</b></td>
+        <td><code>http://localhost:8000/admin</code></td>
+        <td>Enterprise Portal (Gated)</td>
+        <td>Staff operations & audit. Secured by <code>Staff ID: OP-77402</code>, call recording transcripts, transaction search, and fraud escalation queue.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="footer-note">
+    <span>Blackscorche / Lyfpartner Engine</span>
+    <span>Document Page 1 of 2</span>
+  </div>
+
+  <!-- PAGE BREAK -->
+  <div class="page-break"></div>
+
+  <h2>3. Step-by-Step Live Demo Scripts</h2>
+
+  <div class="step-container">
+    <div class="step-item">
+      <div class="step-num">1</div>
+      <div class="step-content">
+        <div class="step-title">Public Balance Inquiry (Zero Friction)</div>
+        <div class="step-desc">
+          User dials <b>333</b> &bull; Assistant greets: <i>"Welcome to Lyfpartner! How can I help you today?"</i> &bull; Caller says: <b>"What is my balance?"</b> &bull; Assistant verifies caller ID on Node 01 & replies: <i>"Your current account balance is 250,000 Naira."</i>
+        </div>
+      </div>
+    </div>
+
+    <div class="step-item">
+      <div class="step-num">2</div>
+      <div class="step-content">
+        <div class="step-title">Funds Transfer with Voice PIN Elevation (Multi-Factor Security)</div>
+        <div class="step-desc">
+          Caller says: <b>"Send 5,000 Naira to Musa Bello."</b> &bull; System identifies Tier 2 sensitive action: <i>"Please speak your 4-digit voice PIN."</i> &bull; Caller speaks: <b>"1 2 3 4"</b> &bull; PBKDF2 hash verifies & elevations session &bull; Caller affirms: <b>"Yes, proceed"</b> &bull; Transaction is debited and SMS reference dispatched.
+        </div>
+      </div>
+    </div>
+
+    <div class="step-item">
+      <div class="step-num">3</div>
+      <div class="step-content">
+        <div class="step-title">Multilingual Code-Switching (Hausa, Yoruba, Igbo)</div>
+        <div class="step-desc">
+          Top-bar selector switches language context:
+          <br>&bull; <b>Hausa:</b> <i>"Ina son duba kudi na"</i> &rarr; Returns balance in authentic Hausa voice.
+          <br>&bull; <b>Yoruba:</b> <i>"Mo fe san owo ina"</i> &rarr; Guides user through electricity bill payments.
+          <br>&bull; <b>Igbo:</b> <i>"Echere m ego ole m nwere"</i> &rarr; Speaks account balance in Igbo.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h2>4. Core Banking State Machine & Security</h2>
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">Deterministic Financial Guards</div>
+      <p class="card-p">
+        While conversational chit-chat is powered by Groq LLM, all financial balances, debit amounts, and PIN checks run through <b>hardcoded deterministic Python controllers</b>. An LLM cannot hallucinate or transfer unauthorized funds.
+      </p>
+    </div>
+    <div class="card">
+      <div class="card-title">Two-Step Verbal Confirmation</div>
+      <p class="card-p">
+        Sensitive monetary transactions require an explicit quote step and verbal affirmation (<i>"Yes", "Confirm", "Proceed", "Oya"</i>) before the ledger creates an irreversible NIP transfer reference.
+      </p>
+    </div>
+  </div>
+
+  <h2>5. Quickstart & Verification Guide</h2>
+  <div class="code-block">
+# 1. Clone & activate Python 3.11 virtual environment
+git clone https://github.com/Blackscorche/lyfpartner.git
+cd lyfpartner && source .venv/bin/activate
+
+# 2. Run backend & frontend server
+python run.py
+# Server running at http://localhost:8000
+
+# 3. Execute Automated End-to-End Test Suite
+python -m pytest -v
+# Result: 14 passed in &lt;15s (100% Green)
+  </div>
+
+  <div class="card card-highlight" style="margin-top: 14px;">
+    <div class="card-title" style="color: #065f46;">✅ Hackathon Evaluation Ready</div>
+    <p class="card-p" style="color: #047857;">
+      Repository is public on GitHub: <b>https://github.com/Blackscorche/lyfpartner</b>. Pure CSS rendering with zero image mockups, active Groq Whisper STT, fast Edge Neural TTS, and full NIP ledger audit capabilities.
+    </p>
+  </div>
+
+  <div class="footer-note">
+    <span>Zenith Bank Zecathon 6.0 &bull; Team Lyfpartner</span>
+    <span>Document Page 2 of 2</span>
+  </div>
+
+</body>
+</html>
