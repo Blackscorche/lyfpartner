@@ -4,6 +4,8 @@
 > Empathetic, autonomous voice banking hotline built for 35M+ Nigerians living with visual impairments or low digital literacy.  
 > Supports **Nigerian English, Hausa, Yoruba, and Igbo**.
 
+🔗 **Live Demo:** [lyfpartner-production.up.railway.app](https://lyfpartner-production.up.railway.app)
+
 ---
 
 ## 📊 Zenith Bank Zecathon 6.0 Pitch Deck
@@ -43,128 +45,160 @@ Download or view the official presentation deck:
 ## 🌟 The Problem & The Solution
 
 - **The Problem:** 35+ million Nigerians are shut out of digital finance by complex mobile apps and confusing USSD menus with strict timeouts. Visually impaired or low-literacy customers are forced to share PINs and phones with third parties, creating massive fraud vulnerability.
-- **The Solution:** Lyfpartner replaces the screens with a zero-interface, toll-free phone number (`333`). Customers dial in, speak naturally in their mother tongue, hear warm female conversational audio, and complete balance checks, transfers, and bill payments with bank-grade privacy protection.
+- **The Solution:** Lyfpartner replaces the screens with a zero-interface, toll-free phone number (`333`). Customers dial in, speak naturally in their mother tongue, hear a warm Nigerian female voice, and complete balance checks, transfers, and bill payments — no smartphone, no data, no literacy required.
 
 ---
 
-## 🔒 Privacy-Aware PIN Authentication (Keypad or Voice)
+## 🤖 AI Engine — Fully Conversational (Not Robotic IVR)
 
-A key innovation designed for judges' evaluation: **Eavesdropping Prevention in Public Spaces**.
-- **Privacy Check First:** Before requesting credentials, the AI assistant explicitly reminds the caller:
-  > *"For your security, hope you are in a private space and have your privacy. Please punch in your 4-digit PIN on the keypad, or say it out loud."*
+Unlike traditional IVR systems that play pre-recorded clips and force "press 1 for balance", Lyfpartner uses a **fully live Groq LLM** (`llama-3.3-70b-versatile`) to power every single turn of the conversation.
+
+### How it works:
+- **Natural intent detection** — The AI understands what the caller wants from freeform speech, in any of the 4 languages, without keyword menus.
+- **Conversational-first flow** — On connect, the AI greets warmly and asks *what you need*, never demanding a PIN upfront. PIN is only requested after the caller states their intent.
+- **Real account context** — The AI is told the caller's live balance and saved beneficiaries before each response, so it speaks to their actual situation.
+- **Multi-turn memory** — The AI remembers what was just said and maintains a coherent conversation across turns.
+- **Zero hallucination on money** — All financial transactions (PIN verification, transfer execution, bill payment) are handled by deterministic Python routines. The LLM can never invent or move money.
+
+### Groq handles:
+Greetings · Intent acknowledgment · PIN prompts · Help questions · Language clarification · Small talk · Anything conversational
+
+### Deterministic code handles:
+PIN hash verification (PBKDF2) · Transfer execution (NIP ledger) · Bill payment · SMS receipt delivery · Transfer confirmation/cancellation
+
+---
+
+## 🔒 Privacy-Aware PIN Authentication
+
+A key innovation: **Eavesdropping Prevention in Public Spaces**.
+
+- **Privacy Check First:** Before requesting credentials, the AI reminds the caller they should be in a private space.
 - **Dual Input Flexibility:**
-  - **Keypad DTMF:** If in a crowded room or public space, the caller can punch their 4-digit PIN secretly on the phone keypad.
-  - **Spoken Voice:** If in private, the caller speaks their PIN (`"1 2 3 4"` or `"one two three four"` or `"daya biyu uku hudu"`).
-- **Zero Hallucination:** PIN verification and account balances are strictly handled by deterministic PBKDF2 hashing routines in Python. The LLM can never hallucinate money movement.
+  - **Keypad DTMF:** Caller punches their 4-digit PIN secretly on the phone keypad (eavesdrop-safe).
+  - **Spoken Voice:** Caller says their PIN aloud (`"1 2 3 4"` or `"one two three four"` or `"daya biyu uku hudu"` in Hausa).
+- **Bank-grade hashing:** PINs are verified with PBKDF2-SHA256. Never stored in plaintext, never sent to the LLM.
+
+---
+
+## 🎙️ Instant Barge-In (AI Stops When You Speak)
+
+The moment the caller starts talking, the AI's audio cuts off instantly — no waiting for it to finish. This is implemented via:
+- `SpeechRecognition.onspeechstart` / `onsoundstart` → immediate `stopSpeaking()` call
+- Dual audio kill: pauses HTML5 `Audio` node + cancels `AudioContext` source node simultaneously
+- Lowered VAD barge-in threshold for hair-trigger responsiveness
+
+---
+
+## 🌍 4-Language Neural TTS Voices
+
+| Language | Voice |
+|---|---|
+| Nigerian English | Microsoft Edge Neural — `en-NG-EzinneNeural` (female) |
+| Hausa | Google TTS — `ha` |
+| Yoruba | Microsoft Edge Neural — `en-NG-EzinneNeural` (fallback) |
+| Igbo | Microsoft Edge Neural — `en-NG-EzinneNeural` (fallback) |
+
+All audio is returned as base64-encoded PCM WAV per turn — no streaming dependency, works on any browser.
 
 ---
 
 ## 🚀 Live Demo & How to Use It
 
-The project runs on `http://localhost:8000` with 3 completely separated views:
+**Live URL:** [https://lyfpartner-production.up.railway.app](https://lyfpartner-production.up.railway.app)
 
-| View | URL | What It Does & How to Use It |
+| View | URL | Description |
 |---|---|---|
-| **Customer Phone Hotline** | [`http://localhost:8000/`](http://localhost:8000/) | **Real Phone Simulator**: Dial `333`, talk hands-free without tapping any buttons. The AI assistant detects your speech, answers in a warm Nigerian female voice, and performs your commands. |
-| **Live Stage Console** | [`http://localhost:8000/stage`](http://localhost:8000/stage) | **Hackathon Presentation View**: Dual-panel view showing the phone simulator side-by-side with live ASR/LLM telemetry, NIP transaction ledger, and step-by-step pipeline tracing. Press `P` for Stage Mode (projector scaling). |
-| **Bank Admin Portal** | [`http://localhost:8000/admin`](http://localhost:8000/admin) | **Enterprise Portal**: Gated by staff auth (`Staff ID: OP-77402`, `Token: lyfpartner2026`). Inspect all completed voice sessions, audio transcripts, and fraud escalation queues. |
+| **Customer Phone** | `/` | Pure voice call simulator — tap the green call button and speak naturally |
+| **Stage Console** | `/stage` | Hackathon presentation view with live ASR/LLM telemetry, NIP ledger, pipeline tracing |
+| **Bank Admin Portal** | `/admin` | Staff portal — `Staff ID: OP-77402`, `Token: lyfpartner2026` |
 
 ---
 
-## 🎙️ Step-by-Step Walkthrough (Demo Scripts)
+## 🎬 Demo Scripts (Step-by-Step)
 
-### Demo 1: Balance Inquiry (Zero Auth Friction)
-1. Open [`http://localhost:8000/`](http://localhost:8000/)
-2. Tap the green call button to dial **333**.
-3. The assistant greets you with privacy advice: *"Welcome to Lyfpartner voice banking. For your security, hope you are in a private space and have your privacy. Please punch in your 4-digit PIN on the keypad, or say it out loud."*
-4. Speak normally: **"What is my account balance?"**
-5. The assistant detects silence automatically, transcribes your speech via Groq Whisper, and replies: *"Your current account balance is 250,000 Naira."*
+### Demo 1: Balance Inquiry
+1. Open the live URL and tap the green call button.
+2. The AI greets you warmly and asks what you need (no PIN demand).
+3. Say: **"What is my account balance?"**
+4. The AI acknowledges, tells you to enter your PIN for security.
+5. Say: **"1 2 3 4"** or punch it on the keypad.
+6. Balance is read back: *"Your account balance is 250,000 Naira."*
 
-### Demo 2: Money Transfer with Voice / Keypad PIN Elevation
-1. While on the call, punch in **`1234`** on the keypad or say: **"My PIN is one two three four"**.
-2. The system validates the hash and replies: *"PIN verified successfully. How can I help you today?"*
-3. Say: **"I want to transfer 5,000 Naira to Musa Bello."**
-4. The system validates the beneficiary, calculates NIP fees, and asks for confirmation: *"You want to transfer 5,000 Naira to Musa Bello. Should I proceed with this transfer?"*
-5. Say: **"Yes, proceed"** (or *"Oya"* / *"Eh"* / *"Go ahead"*).
-6. The transfer executes on the NIP sandbox ledger, generates reference `NIP-20261114-XXXX`, and delivers an immediate SMS receipt notification to the phone.
+### Demo 2: Money Transfer
+1. After greeting, say: **"I want to send 5,000 Naira to Musa."**
+2. AI confirms the intent and asks for PIN (privacy reminder included).
+3. Enter PIN → AI confirms amount & beneficiary → asks *"Should I go ahead?"*
+4. Say: **"Yes"** / **"Oya"** / **"Proceed"**
+5. Transfer executes, SMS receipt sent.
 
-### Demo 3: Multilingual Code-Switching
-1. Select **HA** (Hausa), **YO** (Yoruba), or **IG** (Igbo) on the top bar.
-2. Dial **333**.
-3. **Hausa:** Say *"Ina son in duba ragowar kudi na"* → Assistant replies *"Ragowar asusunka shine 250,000 Naira."*
-4. **Yoruba:** Say *"Mo fe san owo ina"* → Assistant prompts for electricity meter details.
-5. **Igbo:** Say *"Echere m ego ole m nwere"* → Assistant speaks account balance in Igbo.
-
----
-
-## 🛠️ Technology Stack & Architecture
-
-- **Backend:** Python 3.11+, FastAPI (Gateway, KYC, Bank, Support, Unified Runner)
-- **ASR (Speech-to-Text):** Groq Whisper Large v3 Turbo (`whisper-large-v3-turbo`) with real-time `ffmpeg` pipeline transcoding
-- **LLM / Conversational Engine:** Groq API (`openai/gpt-oss-20b`) with deterministic banking security guards
-- **TTS (Text-to-Speech):** Microsoft Edge Neural TTS (`en-NG-EzinneNeural` female Nigerian voice) encoded at native 24kHz PCM16 WAV + Google TTS for regional languages
-- **Frontend:** React 19, Vite, Pure CSS iPhone/Feature Phone Simulators (zero external UI dependencies, zero emojis, full SVG icons)
-- **Database & Ledger:** SQLite / SQLAlchemy async session with NIP ledger audit logs
+### Demo 3: Multilingual
+1. Select **HA**, **YO**, or **IG** language on the top bar.
+2. Speak in that language — AI responds in the same language end-to-end.
+3. Hausa: *"Ina son in duba ragowar kudi na"* → balance in Hausa.
+4. Yoruba: *"Mo fe san owo ina"* → electricity bill flow in Yoruba.
 
 ---
 
-## ⚡ Quickstart & Local Installation
+## 🛠️ Technology Stack
 
-### 1. Prerequisites
-- Python 3.11+
-- Node.js 18+
-- `ffmpeg` (installed via `brew install ffmpeg` on macOS or `apt install ffmpeg` on Linux)
+| Layer | Technology |
+|---|---|
+| Backend | Python 3.11+, FastAPI (unified server) |
+| ASR | Groq Whisper Large v3 Turbo (`whisper-large-v3-turbo`) |
+| LLM | Groq API — `llama-3.3-70b-versatile` (all dialogue turns) |
+| TTS | Microsoft Edge Neural TTS (`en-NG-EzinneNeural`) + Google TTS |
+| Frontend | React 19, Vite, pure CSS phone UI |
+| Database | SQLite + SQLAlchemy async (NIP ledger, audit logs) |
+| Deployment | Railway (auto-deploy from GitHub `main`) |
 
-### 2. Setup Backend & Virtualenv
+---
+
+## ⚡ Quickstart — Local Setup
+
+### Prerequisites
+- Python 3.11+, Node.js 18+, `ffmpeg`
+
 ```bash
+# Clone
 git clone https://github.com/Blackscorche/lyfpartner.git
 cd lyfpartner
 
+# Backend
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-pip install edge-tts gTTS scipy
-```
 
-### 3. Environment Configuration (`.env`)
-Create a `.env` file in the root directory:
-```ini
-TTS_PROVIDER=natural
+# Frontend
+cd web && npm install && npm run build && cd ..
+
+# Environment — create .env
 LLM_PROVIDER=groq
+TTS_PROVIDER=natural
 ASR_PROVIDER=groq
 GROQ_API_KEY=your_groq_api_key_here
-GROQ_MODEL=openai/gpt-oss-20b
-```
+GROQ_MODEL=llama-3.3-70b-versatile
 
-### 4. Build Frontend
-```bash
-cd web
-npm install
-npm run build
-cd ..
-```
-
-### 5. Launch the Server
-```bash
-source .venv/bin/activate
+# Run
 python run.py
 ```
+
 Open **`http://localhost:8000`** in Chrome, Edge, or Safari.
 
 ---
 
-## 🧪 Running Automated Tests
+## 🧪 Automated Tests
 
-Lyfpartner includes a comprehensive test suite validating all end-to-end user journeys:
 ```bash
 source .venv/bin/activate
-python -m pytest -v
+pytest -v
 ```
-**Test Results: 14/14 tests passing (100% green).**
+
+**15/15 tests passing — 100% green.**  
+Tests run with mocked LLM/TTS providers so they never hit the network.
 
 ---
 
 ## 📄 License & Team
 
-Built with ❤️ for **Zenith Bank Zecathon 6.0** by the Lyfpartner Team.
+Built with ❤️ for **Zenith Bank Zecathon 6.0** by the Lyfpartner Team.  
 Licensed under MIT.
