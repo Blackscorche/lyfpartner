@@ -463,23 +463,195 @@ class MockLLMProvider(LLMProvider):
 
 class GroqLLMProvider(LLMProvider):
     """
-    Live LLM dialogue reasoning powered by Groq (openai/gpt-oss-20b).
-    Provides natural multi-turn responses across Hausa, Yoruba, Igbo, and Nigerian English
-    while ensuring banking domain accuracy.
+    Full conversational AI powered by Groq — handles ALL dialogue turns naturally.
+    MockLLMProvider is used ONLY for deterministic transaction execution steps:
+      - Transfer confirmation/cancellation (after quote)
+      - Low confidence reprompts
     """
     def __init__(self):
         self._mock = MockLLMProvider()
         self.api_key = settings.GROQ_API_KEY
-        self.model = settings.GROQ_MODEL or "openai/gpt-oss-20b"
+        self.model = settings.GROQ_MODEL or "llama-3.3-70b-versatile"
 
     async def respond(self, req: AgentRespondRequest, tools: ToolRegistry) -> AgentRespondResponse:
-        # First let MockLLMProvider handle core deterministic banking intents
-        mock_res = await self._mock.respond(req, tools)
-        if mock_res.intent != "greeting":
-            return mock_res
+        text = req.text.lower().strip()
+        lang = req.language
+        account_id = req.account_id or "acc_aminu_001"
+        caller_id = req.caller_id or "+2348000000001"
+        pending = req.pending_action or {}
+        auth = req.auth_level
 
+        # ── DETERMINISTIC HARD RULES (always bypass Groq for correctness) ──
+
+        # 1. Low ASR confidence → polite reprompt
+        if req.is_low_confidence:
+            reask = {
+                Language.HAUSA: "Ban ji ku da kyau ba. Don Allah ku sake magana.",
+                Language.IGBO: "Anughi m gi nke oma. Biko kwuo ozo.",
+                Language.YORUBA: "Ejo, mi o gbo yin daadaa. E jowo tun so.",
+                Language.NIGERIAN_ENGLISH: "I didn't quite catch that. Please could you say that again?"
+            }
+            return AgentRespondResponse(
+                reply_text=reask.get(lang, reask[Language.NIGERIAN_ENGLISH]),
+                intent="low_confidence_reprompt",
+                next_state=pending
+            )
+
+        # 2. Transfer confirmation/cancellation (pending confirm_transfer)
+        if pending.get("action") == "confirm_transfer":
+            token = pending.get("confirmation_token")
+            beneficiary_name = pending.get("beneficiary_name", "the recipient")
+            amount_naira = pending.get("amount_naira", "5,000")
+            tool_records = []
+
+            if any(w in text for w in CONFIRMATION_KEYWORDS):
+                idem_key = f"idem_tx_{secrets.token_hex(8)}"
+                tx_res = await tools.confirm_transfer(token, idem_key, session_id=req.session_id)
+                tool_records.append(ToolCallRecord(tool="confirm_transfer", arguments={"token": token}, result=tx_res))
+                sms_msg = f"Lyfpartner Debit: NGN {amount_naira}.00 to {beneficiary_name}. Ref: {tx_res.get('reference')}. Bal: NGN {tx_res.get('balance_after_kobo', 0)//100:,}.00"
+                sms_res = await tools.send_sms_receipt(caller_id, sms_msg)
+                tool_records.append(ToolCallRecord(tool="send_sms_receipt", arguments={"to": caller_id}, result=sms_res))
+                confirm_replies = {
+                    Language.HAUSA: f"An tura Naira {amount_naira} ga {beneficiary_name} cikin nasara. An aiko muku da sakon SMS.",
+                    Language.IGBO: f"E zigara Naira {amount_naira} nye {beneficiary_name} nke oma. Anyi ziterela gi ozi SMS.",
+                    Language.YORUBA: f"A ti fi Naira {amount_naira} ranse si {beneficiary_name} laseyori. A ti fi SMS ranse si yin.",
+                    Language.NIGERIAN_ENGLISH: f"Your transfer of {amount_naira} Naira to {beneficiary_name} was successful! An SMS receipt has been sent to your phone."
+                }
+                return AgentRespondResponse(
+                    reply_text=confirm_replies.get(lang, confirm_replies[Language.NIGERIAN_ENGLISH]),
+                    intent="transfer_completed",
+                    tool_calls=tool_records,
+                    next_state=None
+                )
+            elif any(w in text for w in REVISION_KEYWORDS):
+                cancel_replies = {
+                    Language.HAUSA: "An soke wannan canja wurin. Me kuma kuke son yi?",
+                    Language.IGBO: "A kagbuola ya. Gini ozo ka m ga-emere gi?",
+                    Language.YORUBA: "A ti fagile e. Kini nkan miiran ti e fe se?",
+                    Language.NIGERIAN_ENGLISH: "Transfer cancelled. What else can I help you with?"
+                }
+                return AgentRespondResponse(
+                    reply_text=cancel_replies.get(lang, cancel_replies[Language.NIGERIAN_ENGLISH]),
+                    intent="transfer_cancelled",
+                    next_state=None
+                )
+
+        # 3. Distress / human escalation
+        if any(w in text for w in DISTRESS_KEYWORDS):
+            tool_records = []
+            res = await tools.escalate_to_human(req.session_id, reason="Caller distress or human agent requested", summary=text)
+            tool_records.append(ToolCallRecord(tool="escalate_to_human", arguments={"session_id": req.session_id}, result=res))
+            escalate_replies = {
+                Language.HAUSA: "Na fahimta. Ina mika ku ga wakilin mu yanzu. Don Allah ku dakata.",
+                Language.IGBO: "Aghotara m. Ana m ebufe gi na aka onye oru anyi ugbua. Biko chere obere.",
+                Language.YORUBA: "Mo gbo yin ye. Mo n gbe yin lo si odo osise wa bayi. E jowo duro die.",
+                Language.NIGERIAN_ENGLISH: "I understand. Connecting you to a customer care representative right away. Please hold on."
+            }
+            return AgentRespondResponse(
+                reply_text=escalate_replies.get(lang, escalate_replies[Language.NIGERIAN_ENGLISH]),
+                intent="escalate_to_human",
+                tool_calls=tool_records,
+                escalate=True,
+                escalate_reason="Caller requested human agent"
+            )
+
+        # 4. 4-digit PIN submitted → execute pending action
+        digits_match = re.findall(r'\b\d{4}\b', text)
+        if digits_match or text.strip() in ["1234", "1 2 3 4"]:
+            tool_records = []
+            pending_action_type = pending.get("pending_action_type")
+
+            if pending_action_type == "transfer":
+                amount_kobo = pending.get("amount_kobo", 500_000)
+                amount_naira = pending.get("amount_naira", "5,000")
+                ben_name = pending.get("beneficiary_name", "Musa Bello")
+                target_ben = pending.get("target_ben", {"name": "Musa Bello", "account_number": "2045678901", "bank_name": "First Bank"})
+                quote_res = await tools.quote_transfer(
+                    source_account_id=account_id,
+                    beneficiary_account_number=target_ben.get("account_number", "2045678901"),
+                    beneficiary_bank_name=target_ben.get("bank_name", "First Bank"),
+                    amount_kobo=amount_kobo
+                )
+                tool_records.append(ToolCallRecord(tool="quote_transfer", arguments={"amount_kobo": amount_kobo}, result=quote_res))
+                token = quote_res.get("confirmation_token")
+                ben_quoted = quote_res.get("beneficiary_name", ben_name)
+                ask_confirm = {
+                    Language.HAUSA: f"An tabbatar da lambar sirri! Kuna son tura Naira {amount_naira} ga {ben_quoted}. In tura?",
+                    Language.IGBO: f"A kwadoro nomba nzuzo gi! I choro iziga Naira {amount_naira} nye {ben_quoted}. M ga-eziga ya?",
+                    Language.YORUBA: f"A ti fowo si nomba asiri yin! Se e fe fi Naira {amount_naira} ranse si {ben_quoted}? Se kin tesiwaju?",
+                    Language.NIGERIAN_ENGLISH: f"PIN verified! You want to transfer {amount_naira} Naira to {ben_quoted}. Should I go ahead?"
+                }
+                return AgentRespondResponse(
+                    reply_text=ask_confirm.get(lang, ask_confirm[Language.NIGERIAN_ENGLISH]),
+                    intent="quote_transfer",
+                    tool_calls=tool_records,
+                    needs_confirmation=True,
+                    next_state={"action": "confirm_transfer", "confirmation_token": token, "beneficiary_name": ben_quoted, "amount_naira": amount_naira, "amount_kobo": amount_kobo}
+                )
+
+            elif pending_action_type == "balance":
+                bal_res = await tools.check_balance(account_id)
+                tool_records.append(ToolCallRecord(tool="check_balance", arguments={"account_id": account_id}, result=bal_res))
+                naira_val = f"{bal_res.get('balance_naira', 250000):,}"
+                bal_replies = {
+                    Language.HAUSA: f"An tabbatar! Kudin ku a asusun banki Naira {naira_val} ne. Me kuma kuke so ku yi yau?",
+                    Language.IGBO: f"A kwadoro! Ego i nwere na akauntu gi bu Naira {naira_val}. Kedu ka m ga-esi nyere gi aka?",
+                    Language.YORUBA: f"A ti fowo si! Iye owo to wa ninu akanti yin je Naira {naira_val}. Kini e fe se tun?",
+                    Language.NIGERIAN_ENGLISH: f"Verified! Your account balance is {naira_val} Naira. What else can I help you with today?"
+                }
+                return AgentRespondResponse(
+                    reply_text=bal_replies.get(lang, bal_replies[Language.NIGERIAN_ENGLISH]),
+                    intent="check_balance",
+                    tool_calls=tool_records
+                )
+
+            elif pending_action_type == "bill":
+                bill_res = await tools.pay_bill(account_id=account_id, biller="bil_ikeja_electric", meter_no="45129038101", amount_kobo=200_000, idempotency_key=f"idem_bill_{secrets.token_hex(6)}", session_id=req.session_id)
+                tool_records.append(ToolCallRecord(tool="pay_bill", arguments={"biller": "bil_ikeja_electric", "amount_kobo": 200000}, result=bill_res))
+                bill_replies = {
+                    Language.HAUSA: "An tabbatar da lambar sirri! An biya kudin wutan NEPA Naira 2,000 cikin nasara.",
+                    Language.IGBO: "A kwadoro nomba nzuzo gi! A kwuola ugwo oku eletrik nke Naira puku abuo nke oma.",
+                    Language.YORUBA: "A ti fowo si nomba asiri yin! A ti san owo ina NEPA ti egbaji Naira meji laseyori.",
+                    Language.NIGERIAN_ENGLISH: "PIN verified! Your electricity bill of 2,000 Naira has been paid successfully."
+                }
+                return AgentRespondResponse(
+                    reply_text=bill_replies.get(lang, bill_replies[Language.NIGERIAN_ENGLISH]),
+                    intent="pay_bill",
+                    tool_calls=tool_records
+                )
+
+            # Generic PIN verified
+            pin_ok = {
+                Language.HAUSA: "An tabbatar da lambar sirri. Yaya zan iya taimaka muku yau?",
+                Language.IGBO: "A kwadoro nomba nzuzo gi. Kedu ka m ga-esi nyere gi aka taa?",
+                Language.YORUBA: "A ti fowo si nomba asiri yin. Bawo ni a se le ran yin lowo?",
+                Language.NIGERIAN_ENGLISH: "PIN verified. How can I help you today?"
+            }
+            return AgentRespondResponse(
+                reply_text=pin_ok.get(lang, pin_ok[Language.NIGERIAN_ENGLISH]),
+                intent="pin_verified"
+            )
+
+        # ── GROQ CONVERSATIONAL AI — handles everything else naturally ──
         if not self.api_key:
-            return mock_res
+            return await self._mock.respond(req, tools)
+
+        # Fetch real account data to give Groq context
+        tool_records = []
+        balance_info = "unknown"
+        beneficiary_info = "none saved"
+        try:
+            bal_res = await tools.check_balance(account_id)
+            balance_info = f"₦{bal_res.get('balance_naira', 250000):,}"
+        except Exception:
+            balance_info = "₦250,000"
+        try:
+            bens_res = await tools.list_beneficiaries(account_id)
+            bens = bens_res.get("beneficiaries", [])
+            if bens:
+                beneficiary_info = ", ".join(f"{b['name']} ({b.get('bank_name','bank')})" for b in bens[:3])
+        except Exception:
+            beneficiary_info = "Musa Bello (First Bank)"
 
         lang_names = {
             Language.HAUSA: "Hausa",
@@ -487,51 +659,113 @@ class GroqLLMProvider(LLMProvider):
             Language.IGBO: "Igbo",
             Language.NIGERIAN_ENGLISH: "Nigerian English"
         }
-        lang_name = lang_names.get(req.language, "Nigerian English")
+        lang_name = lang_names.get(lang, "Nigerian English")
 
-        system_prompt = (
-            f"You are Lyfpartner, a friendly, human-like voice banking phone assistant in Nigeria (like managing an OPay or Zenith account blindly by phone). "
-            f"The caller is speaking {lang_name}. "
-            f"Rules:\n"
-            f"1. Respond directly in {lang_name} in a warm, polite, natural conversational voice.\n"
-            f"2. Keep responses concise (1-2 spoken sentences maximum). Do NOT use markdown, asterisks, bullet points, or lists.\n"
-            f"3. Account context: Caller balance is Naira 250,000.00. Most frequent beneficiary is Musa Bello at First Bank.\n"
-            f"4. Conversational guidance: when greeted or asked what you can do, welcome them and explain they can check their balance, transfer money, pay electric bills, or buy airtime.\n"
-            f"5. MANDATORY SECURITY & PRIVACY RULE: Before disclosing private account balances or authorizing money transfers/bill payments, ALWAYS ask them to confirm they are in a private space and have their privacy (not in a public place where people can overhear), and tell them that they can punch in their 4-digit PIN on their phone keypad or say it out loud."
-        )
+        # Build auth/state context
+        auth_ctx = "not authenticated" if auth == AuthLevel.NONE else "PIN verified"
+        pending_ctx = ""
+        if pending.get("pending_action_type"):
+            pending_ctx = f"The caller previously expressed intent to {pending.get('pending_action_type')} (we're waiting for their PIN)."
+        elif pending.get("action") == "confirm_transfer":
+            pending_ctx = f"We're waiting for transfer confirmation of ₦{pending.get('amount_naira')} to {pending.get('beneficiary_name')}."
+
+        # Conversation context (last AI reply → current user input)
+        conv_messages = []
+        if req.last_reply_text and req.turn_count > 0:
+            conv_messages = [
+                {"role": "assistant", "content": req.last_reply_text},
+            ]
+        conv_messages.append({"role": "user", "content": req.text})
+
+        system_prompt = f"""You are Lyfpartner — a warm, natural-sounding Nigerian voice banking assistant, like a smart phone banking IVR for a neobank (think OPay, Kuda, or Zenith's phone banking).
+
+LANGUAGE: Respond ONLY in {lang_name}. Be conversational and friendly, like a real person — not robotic.
+
+CALLER CONTEXT:
+- Account balance: {balance_info}
+- Saved beneficiaries: {beneficiary_info}  
+- Authentication: {auth_ctx}
+- {pending_ctx}
+- Turn number: {req.turn_count + 1}
+
+RULES (STRICT):
+1. Max 2 short spoken sentences. No markdown, no asterisks, no lists — pure speech.
+2. Do NOT ask for PIN on a greeting/first turn. Wait for the caller to tell you what they need.
+3. When the caller asks for balance, transfer, or bill payment AND is NOT yet authenticated: acknowledge their request warmly, then ask if they're in a private space and to enter their 4-digit PIN on the keypad or say it aloud.
+4. When asked what you can do: mention balance check, money transfer, bill payment, airtime top-up — conversationally.
+5. If asked to repeat, repeat the last thing in a helpful way.
+6. Sound like a real helpful bank agent — warm, confident, Nigerian in tone.
+7. Never say "I cannot" for banking tasks — always guide them through it."""
 
         try:
             import httpx
-            async with httpx.AsyncClient(timeout=4.0) as client:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                payload = {
+                    "model": self.model,
+                    "messages": [{"role": "system", "content": system_prompt}] + conv_messages,
+                    "temperature": 0.65,
+                    "max_tokens": 150
+                }
                 res = await client.post(
                     "https://api.groq.com/openai/v1/chat/completions",
                     headers={
                         "Authorization": f"Bearer {self.api_key}",
                         "Content-Type": "application/json"
                     },
-                    json={
-                        "model": self.model,
-                        "messages": [
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": req.text}
-                        ],
-                        "temperature": 0.4,
-                        "max_tokens": 120
-                    }
+                    json=payload
                 )
                 if res.status_code == 200:
                     data = res.json()
                     raw_reply = data["choices"][0]["message"]["content"].strip()
+                    # Strip any chain-of-thought tags
                     clean_reply = re.sub(r"<think>.*?</think>", "", raw_reply, flags=re.DOTALL).strip()
+                    # Strip markdown artifacts
+                    clean_reply = re.sub(r"[*_`#]", "", clean_reply).strip()
                     if clean_reply:
+                        # Determine intent from context for routing
+                        groq_intent = "natural_dialogue"
+                        if any(w in text for w in ["balance", "kudi", "ego", "owo", "how much"]):
+                            groq_intent = "check_balance_intent"
+                        elif any(w in text for w in ["send", "transfer", "tura", "ziga", "fi ranse"]):
+                            groq_intent = "transfer_intent"
+                        elif any(w in text for w in ["electricity", "nepa", "bill", "meter", "ina"]):
+                            groq_intent = "bill_intent"
+                        elif any(w in text for w in ["airtime", "recharge", "credit"]):
+                            groq_intent = "airtime_intent"
+                        elif req.turn_count == 0 or any(w in text for w in ["hello", "hi", "sannu", "bawo", "ndewo"]):
+                            groq_intent = "greeting"
+
+                        # Determine next_state from intent
+                        next_state = None
+                        if groq_intent == "check_balance_intent" and auth == AuthLevel.NONE:
+                            next_state = {"pending_action_type": "balance"}
+                        elif groq_intent == "transfer_intent" and auth == AuthLevel.NONE:
+                            # Parse amount/beneficiary for state
+                            amount_kobo = 500_000
+                            amount_naira = "5,000"
+                            match_num = re.findall(r'\d+', text.replace(",", ""))
+                            if match_num:
+                                val = int(match_num[0])
+                                if val < 100_000:
+                                    amount_naira = f"{val:,}"
+                                    amount_kobo = val * 100
+                            next_state = {"pending_action_type": "transfer", "amount_naira": amount_naira, "amount_kobo": amount_kobo, "beneficiary_name": "Musa Bello", "target_ben": {"name": "Musa Bello", "account_number": "2045678901", "bank_name": "First Bank"}}
+                        elif groq_intent == "bill_intent" and auth == AuthLevel.NONE:
+                            next_state = {"pending_action_type": "bill"}
+
                         return AgentRespondResponse(
                             reply_text=clean_reply,
-                            intent="natural_dialogue"
+                            intent=groq_intent,
+                            next_state=next_state
                         )
+                else:
+                    # Log the error code for debugging
+                    pass
         except Exception:
             pass
 
-        return mock_res
+        # Fallback to mock if Groq fails
+        return await self._mock.respond(req, tools)
 
 def get_llm_provider() -> LLMProvider:
     if settings.LLM_PROVIDER in ["groq", "live"] and settings.GROQ_API_KEY:

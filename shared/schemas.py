@@ -87,6 +87,8 @@ class AgentRespondRequest(BaseModel):
     auth_level: AuthLevel = AuthLevel.NONE
     pending_action: Optional[Dict[str, Any]] = None
     is_low_confidence: bool = False
+    last_reply_text: Optional[str] = None  # Previous AI turn for multi-turn context
+    turn_count: int = 0  # How many turns into the session
 
 class ToolCallRecord(BaseModel):
     tool: str

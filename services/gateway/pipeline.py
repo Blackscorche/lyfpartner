@@ -124,7 +124,9 @@ class TurnPipeline:
             account_id=session.account_id or "acc_aminu_001",
             auth_level=AuthLevel(session.auth_level),
             pending_action=pending_dict,
-            is_low_confidence=is_low_conf
+            is_low_confidence=is_low_conf,
+            last_reply_text=session.last_reply_text,
+            turn_count=session.turn_count
         )
         agent_res = await self.llm_provider.respond(agent_req, self.tools)
         reply_text = agent_res.reply_text
