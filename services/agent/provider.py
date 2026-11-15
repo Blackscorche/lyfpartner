@@ -79,17 +79,91 @@ class MockLLMProvider(LLMProvider):
             }
             return AgentRespondResponse(
                 reply_text=pin_inquiry_replies.get(lang, pin_inquiry_replies[Language.NIGERIAN_ENGLISH]),
-                intent="pin_privacy_prompt"
+                intent="pin_privacy_prompt",
+                next_state=pending
             )
 
         # 2c. Rule: 4-digit PIN submitted
         digits_match = re.findall(r'\b\d{4}\b', text)
         if digits_match or text.strip() in ["1234", "1 2 3 4"]:
+            pending_action_type = pending.get("pending_action_type")
+            if pending_action_type == "transfer":
+                amount_kobo = pending.get("amount_kobo", 500_000)
+                amount_naira = pending.get("amount_naira", "5,000")
+                ben_name = pending.get("beneficiary_name", "Musa Bello")
+                target_ben = pending.get("target_ben", {
+                    "name": "Musa Bello",
+                    "account_number": "2045678901",
+                    "bank_name": "First Bank"
+                })
+
+                quote_res = await tools.quote_transfer(
+                    source_account_id=account_id,
+                    beneficiary_account_number=target_ben.get("account_number", "2045678901"),
+                    beneficiary_bank_name=target_ben.get("bank_name", "First Bank"),
+                    amount_kobo=amount_kobo
+                )
+                tool_records.append(ToolCallRecord(tool="quote_transfer", arguments={"amount_kobo": amount_kobo}, result=quote_res))
+
+                token = quote_res.get("confirmation_token")
+                ben_quoted = quote_res.get("beneficiary_name", ben_name)
+
+                ask_confirm_replies = {
+                    Language.HAUSA: f"An tabbatar da lambar sirri! Kuna son tura Naira {amount_naira} ga {ben_quoted}. In tura?",
+                    Language.IGBO: f"A kwadoro nomba nzuzo gi! I choro iziga Naira {amount_naira} nye {ben_quoted}. M ga-eziga ya?",
+                    Language.YORUBA: f"A ti fowo si nomba asiri yin! Se e fe fi Naira {amount_naira} ranse si {ben_quoted}? Se kin tesiwaju?",
+                    Language.NIGERIAN_ENGLISH: f"PIN verified! You want to transfer {amount_naira} Naira to {ben_quoted} at First Bank. Should I proceed with this transfer?"
+                }
+                return AgentRespondResponse(
+                    reply_text=ask_confirm_replies.get(lang, ask_confirm_replies[Language.NIGERIAN_ENGLISH]),
+                    intent="quote_transfer",
+                    tool_calls=tool_records,
+                    needs_confirmation=True,
+                    next_state={
+                        "action": "confirm_transfer",
+                        "confirmation_token": token,
+                        "beneficiary_name": ben_quoted,
+                        "amount_naira": amount_naira,
+                        "amount_kobo": amount_kobo
+                    }
+                )
+
+            elif pending_action_type == "balance":
+                bal_res = await tools.check_balance(account_id)
+                tool_records.append(ToolCallRecord(tool="check_balance", arguments={"account_id": account_id}, result=bal_res))
+                naira_val = f"{bal_res.get('balance_naira', 250000):,}"
+                bal_replies = {
+                    Language.HAUSA: f"An tabbatar da lambar sirri! Kudin ku a asusun banki Naira {naira_val} ne. Me kuma kuke so ku yi yau?",
+                    Language.IGBO: f"A kwadoro nomba nzuzo gi! Ego ole i nwere na akauntu gi bu Naira {naira_val}. Kedu ka m ga-esi nyere gi aka taa?",
+                    Language.YORUBA: f"A ti fowo si nomba asiri yin! Iye owo to wa ninu akanti yin je Naira {naira_val}. Kini nkan miiran ti a le se fun yin?",
+                    Language.NIGERIAN_ENGLISH: f"PIN verified! Your current account balance is {naira_val} Naira. How else can I help you today?"
+                }
+                return AgentRespondResponse(
+                    reply_text=bal_replies.get(lang, bal_replies[Language.NIGERIAN_ENGLISH]),
+                    intent="check_balance",
+                    tool_calls=tool_records
+                )
+
+            elif pending_action_type == "bill":
+                bill_res = await tools.pay_bill(account_id=account_id, biller="bil_ikeja_electric", meter_no="45129038101", amount_kobo=200_000, idempotency_key=f"idem_bill_{secrets.token_hex(6)}", session_id=req.session_id)
+                tool_records.append(ToolCallRecord(tool="pay_bill", arguments={"biller": "bil_ikeja_electric", "amount_kobo": 200000}, result=bill_res))
+                bill_replies = {
+                    Language.HAUSA: "An tabbatar da lambar sirri! An biya kudin wutan NEPA Naira 2,000 cikin nasara.",
+                    Language.IGBO: "A kwadoro nomba nzuzo gi! A kwuola ugwo oku eletrik nke Naira puku abuo nke oma.",
+                    Language.YORUBA: "A ti fowo si nomba asiri yin! A ti san owo ina NEPA ti egbaji Naira meji laseyori.",
+                    Language.NIGERIAN_ENGLISH: "PIN verified! Your electricity bill payment of 2,000 Naira has been successfully paid."
+                }
+                return AgentRespondResponse(
+                    reply_text=bill_replies.get(lang, bill_replies[Language.NIGERIAN_ENGLISH]),
+                    intent="pay_bill",
+                    tool_calls=tool_records
+                )
+
             pin_success_replies = {
-                Language.HAUSA: "An tabbatar da lambar sirri cikin nasara. Yaya zan iya taimaka muku yau?",
-                Language.IGBO: "A kwadoro nomba nzuzo gi nke oma. Kedu ka m ga-esi nyere gi aka taa?",
-                Language.YORUBA: "A ti fowo si nomba asiri yin laseyori. Bawo ni a se le ran yin lowo loni?",
-                Language.NIGERIAN_ENGLISH: "PIN verified successfully. How can I help you today?"
+                Language.HAUSA: "An tabbatar da lambar sirri cikin nasara. Yaya zan iya taimaka muku yau? Kuna iya duba kudi, tura kudi, ko biyan kudin wuta.",
+                Language.IGBO: "A kwadoro nomba nzuzo gi nke oma. Kedu ka m ga-esi nyere gi aka taa? I nwere ike ilele ego gi, zipu ego, ma obu kwuo ugwo oku.",
+                Language.YORUBA: "A ti fowo si nomba asiri yin laseyori. Bawo ni a se le ran yin lowo loni? E le wo iye owo yin, gbe owo ranse, tabi san owo ina.",
+                Language.NIGERIAN_ENGLISH: "PIN verified successfully. How can I help you today? You can check your balance, transfer money, or pay bills."
             }
             return AgentRespondResponse(
                 reply_text=pin_success_replies.get(lang, pin_success_replies[Language.NIGERIAN_ENGLISH]),
@@ -190,6 +264,29 @@ class MockLLMProvider(LLMProvider):
                     "bank_name": "First Bank"
                 }
 
+            ben_name = target_ben["name"]
+            amt_fmt = f"{amount_naira:,}"
+
+            # If user has not authenticated with PIN yet, prompt for privacy and PIN
+            if req.auth_level == AuthLevel.NONE:
+                pin_prompts = {
+                    Language.HAUSA: f"Na fahimta, kuna son tura Naira {amt_fmt} ga {ben_name}. Don tsaronka, da fatan kana wuri mai natsuwa da sirri ba a cikin jama'a ba. Za ka iya danna lambar sirrinka ta PIN a kan keypad ko kuma ka fadi ta a fili.",
+                    Language.IGBO: f"Aghọtara m, ị chọrọ iziga Naira {amt_fmt} nye {ben_name}. Maka nchekwa gi, anyi nwere olileanya na ino n'ebe zoro ezo nwere nchekwa. Biko pia nọmba nzuzo PIN gi na keypad ma ọ bụ kwuo ya n'ọlụ.",
+                    Language.YORUBA: f"Mo gbọ, ẹ fẹ fi Naira {amt_fmt} ranṣẹ si {ben_name}. Fun aabo rẹ, a lero pe o wa ni aye ikọkọ ti o ni aabo. Jọwọ tẹ nọmba aṣiri PIN rẹ lori keypad tabi ki o sọ ọ jade.",
+                    Language.NIGERIAN_ENGLISH: f"Alright! You want to send {amt_fmt} Naira to {ben_name}. For your security, hope you are in a private space and have your privacy? Please punch in your 4-digit PIN on the keypad, or say it out loud."
+                }
+                return AgentRespondResponse(
+                    reply_text=pin_prompts.get(lang, pin_prompts[Language.NIGERIAN_ENGLISH]),
+                    intent="pin_privacy_prompt",
+                    next_state={
+                        "pending_action_type": "transfer",
+                        "amount_naira": amt_fmt,
+                        "amount_kobo": amount_kobo,
+                        "beneficiary_name": ben_name,
+                        "target_ben": target_ben
+                    }
+                )
+
             quote_res = await tools.quote_transfer(
                 source_account_id=account_id,
                 beneficiary_account_number=target_ben["account_number"],
@@ -199,14 +296,13 @@ class MockLLMProvider(LLMProvider):
             tool_records.append(ToolCallRecord(tool="quote_transfer", arguments={"amount_kobo": amount_kobo}, result=quote_res))
 
             token = quote_res.get("confirmation_token")
-            ben_name = quote_res.get("beneficiary_name", target_ben["name"])
-            amt_fmt = f"{amount_naira:,}"
+            ben_quoted = quote_res.get("beneficiary_name", ben_name)
 
             ask_confirm_replies = {
-                Language.HAUSA: f"Kuna son tura Naira {amt_fmt} ga {ben_name}. In tura?",
-                Language.IGBO: f"I choro iziga Naira {amt_fmt} nye {ben_name}. M ga-eziga ya?",
-                Language.YORUBA: f"Se e fe fi Naira {amt_fmt} ranse si {ben_name}? Se kin tesiwaju?",
-                Language.NIGERIAN_ENGLISH: f"You want to transfer {amt_fmt} Naira to {ben_name}. Should I proceed with this transfer?"
+                Language.HAUSA: f"Kuna son tura Naira {amt_fmt} ga {ben_quoted}. In tura?",
+                Language.IGBO: f"I choro iziga Naira {amt_fmt} nye {ben_quoted}. M ga-eziga ya?",
+                Language.YORUBA: f"Se e fe fi Naira {amt_fmt} ranse si {ben_quoted}? Se kin tesiwaju?",
+                Language.NIGERIAN_ENGLISH: f"You want to transfer {amt_fmt} Naira to {ben_quoted}. Should I proceed with this transfer?"
             }
 
             return AgentRespondResponse(
@@ -217,7 +313,7 @@ class MockLLMProvider(LLMProvider):
                 next_state={
                     "action": "confirm_transfer",
                     "confirmation_token": token,
-                    "beneficiary_name": ben_name,
+                    "beneficiary_name": ben_quoted,
                     "amount_naira": amt_fmt,
                     "amount_kobo": amount_kobo
                 }
@@ -235,6 +331,19 @@ class MockLLMProvider(LLMProvider):
             is_bill_request = True
 
         if is_bill_request:
+            if req.auth_level == AuthLevel.NONE:
+                bill_pin_prompts = {
+                    Language.HAUSA: "Zan taimaka muku wajen biyan kudin wuta. Don tsaronka, da fatan kana wuri mai natsuwa da sirri ba a cikin jama'a ba. Za ka iya danna lambar sirrinka ta PIN a kan keypad ko kuma ka fadi ta a fili.",
+                    Language.IGBO: "Ka anyi kwuo ugwo oku eletrik gi. Maka nchekwa gi, anyi nwere olileanya na ino n'ebe zoro ezo nwere nchekwa. Biko pia nomba nzuzo PIN gi na keypad ma obu kwuo ya n'olu.",
+                    Language.YORUBA: "E je ki a san owo ina yin. Fun aabo re, a lero pe o wa ni aye ikoko ti o ni aabo. Jowo te nomba asiri PIN re lori keypad tabi ki o so o jade.",
+                    Language.NIGERIAN_ENGLISH: "Sure, let's pay your electricity bill. For your security, hope you are in a private space and have your privacy? Please punch in your 4-digit PIN on the keypad, or say it out loud."
+                }
+                return AgentRespondResponse(
+                    reply_text=bill_pin_prompts.get(lang, bill_pin_prompts[Language.NIGERIAN_ENGLISH]),
+                    intent="pin_privacy_prompt",
+                    next_state={"pending_action_type": "bill"}
+                )
+
             biller_id = "bil_ikeja_electric"
             meter_no = "45129038101"
             amount_kobo = 200_000 # 2,000 NGN
@@ -264,6 +373,19 @@ class MockLLMProvider(LLMProvider):
 
         # 7. Intent: Check Balance
         if any(w in text for w in ["balance", "duba kudi", "kudi na", "kudi", "ego ole", "ile ego", "iye owo", "owo mi", "how much", "how much i get", "check my account"]):
+            if req.auth_level == AuthLevel.NONE:
+                bal_pin_prompts = {
+                    Language.HAUSA: "Zan taimake ku duba ragowar kudin asusunku. Don tsaronka, da fatan kana wuri mai natsuwa da sirri ba a cikin jama'a ba. Za ka iya danna lambar sirrinka ta PIN a kan keypad ko kuma ka fadi ta a fili.",
+                    Language.IGBO: "Enwere m ike inyere gi aka ilele ego di na akaụntụ gi. Maka nchekwa gi, anyi nwere olileanya na ino n'ebe zoro ezo nwere nchekwa. Biko pia nomba nzuzo PIN gi na keypad ma obu kwuo ya n'olu.",
+                    Language.YORUBA: "Mo le ran yin lowo lati wo iye owo to ku ninu akaunti yin. Fun aabo re, a lero pe o wa ni aye ikoko ti o ni aabo. Jowo te nomba asiri PIN re lori keypad tabi ki o so o jade.",
+                    Language.NIGERIAN_ENGLISH: "I can help you check your account balance. For your security, hope you are in a private space and have your privacy? Please punch in your 4-digit PIN on the keypad, or say it out loud."
+                }
+                return AgentRespondResponse(
+                    reply_text=bal_pin_prompts.get(lang, bal_pin_prompts[Language.NIGERIAN_ENGLISH]),
+                    intent="pin_privacy_prompt",
+                    next_state={"pending_action_type": "balance"}
+                )
+
             bal_res = await tools.check_balance(account_id)
             tool_records.append(ToolCallRecord(tool="check_balance", arguments={"account_id": account_id}, result=bal_res))
             
@@ -278,6 +400,19 @@ class MockLLMProvider(LLMProvider):
                 reply_text=bal_replies.get(lang, bal_replies[Language.NIGERIAN_ENGLISH]),
                 intent="check_balance",
                 tool_calls=tool_records
+            )
+
+        # 7b. Intent: Services Inquiry / Help / What can you do
+        if any(w in text for w in ["help", "service", "services", "options", "what can you do", "taimako", "iranlowo", "enyemaka", "kini e le se", "me za ku iya yi", "kedu ihe"]):
+            help_replies = {
+                Language.HAUSA: "Tare da Lyfpartner, kuna iya duba ragowar kudi, tura kudi zuwa kowane banki, biyan kudin wutan lantarki, ko sayen katin waya. Me kuke so ku yi yanzu?",
+                Language.IGBO: "Site na Lyfpartner, i nwere ike ilele ego gi, zipu ego na banki obula, kwuo ugwo oku eletrik, ma obu zuta kaadi ikuku. Kedu ihe i choro ime ugbua?",
+                Language.YORUBA: "Pelu Lyfpartner, e le wo iye owo yin, gbe owo ranse si banki kankan, san owo ina bi IKEDC, tabi ra kaadi ipe. Kini e fe se nisisiyi?",
+                Language.NIGERIAN_ENGLISH: "With Lyfpartner, you can check your live balance, transfer money to any bank account, pay electricity bills like IKEDC, or buy airtime. What would you like to do right now?"
+            }
+            return AgentRespondResponse(
+                reply_text=help_replies.get(lang, help_replies[Language.NIGERIAN_ENGLISH]),
+                intent="help_services"
             )
 
         # 8. Intent: Buy Airtime
@@ -316,10 +451,10 @@ class MockLLMProvider(LLMProvider):
 
         # 10. Default Friendly Greeting / Assistance in selected language
         greetings = {
-            Language.HAUSA: "Sannu! Barka da zuwa Lyfpartner. Zan iya taimaka muku duba kudi ko tura kudi.",
-            Language.IGBO: "Ndewo! Nno na Lyfpartner. Enwere m ike inyere gi aka ile ego gi ma obu ziga ego.",
-            Language.YORUBA: "Bawo! E kaabo si Lyfpartner. Mo le ran yin lowo lati wo owo yin tabi fi owo ranse.",
-            Language.NIGERIAN_ENGLISH: "Welcome to Lyfpartner hotline! I can help you check balance, transfer money, or pay bills."
+            Language.HAUSA: "Sannu! Barka da zuwa Lyfpartner. Yaya zan iya taimaka muku yau? Kuna iya duba kudi a asusu, tura kudi ga wani, ko biyan kudin wuta.",
+            Language.IGBO: "Nnọọ! Nnọọ na Lyfpartner. Kedu ka m ga-esi nyere gi aka taa? I nwere ike ilele ego gi, zipu ego, ma obu kwuo ugwo oku eletrik.",
+            Language.YORUBA: "Bawo ni! E kaabo si Lyfpartner. Bawo ni a se le ran yin lowo loni? E le wo iye owo yin, gbe owo ranse, tabi san owo ina.",
+            Language.NIGERIAN_ENGLISH: "Hello! Welcome to Lyfpartner Voice Banking. How can I assist you today? You can check your balance, transfer money to anyone, or pay electricity bills."
         }
         return AgentRespondResponse(
             reply_text=greetings.get(lang, greetings[Language.NIGERIAN_ENGLISH]),
@@ -355,14 +490,14 @@ class GroqLLMProvider(LLMProvider):
         lang_name = lang_names.get(req.language, "Nigerian English")
 
         system_prompt = (
-            f"You are Lyfpartner, an inclusive voice banking phone assistant in Nigeria for everyday citizens. "
+            f"You are Lyfpartner, a friendly, human-like voice banking phone assistant in Nigeria (like managing an OPay or Zenith account blindly by phone). "
             f"The caller is speaking {lang_name}. "
             f"Rules:\n"
-            f"1. Respond directly in {lang_name} in a warm, polite, natural voice.\n"
-            f"2. Keep it to 1-2 spoken sentences maximum. Do NOT use markdown, asterisks, or lists.\n"
-            f"3. Account context: Caller balance is Naira 250,000.00. Common beneficiary is Musa Bello.\n"
-            f"4. If they ask about services, state they can check balance, transfer money, pay electric bills, or buy airtime.\n"
-            f"5. MANDATORY SECURITY & PRIVACY RULE: Whenever asking the caller for their PIN or discussing authentication, ALWAYS ask them to confirm they are in a private space and have their privacy (not in a public place where people can overhear), and tell them that they can punch in their 4-digit PIN on their phone keypad or say it out loud."
+            f"1. Respond directly in {lang_name} in a warm, polite, natural conversational voice.\n"
+            f"2. Keep responses concise (1-2 spoken sentences maximum). Do NOT use markdown, asterisks, bullet points, or lists.\n"
+            f"3. Account context: Caller balance is Naira 250,000.00. Most frequent beneficiary is Musa Bello at First Bank.\n"
+            f"4. Conversational guidance: when greeted or asked what you can do, welcome them and explain they can check their balance, transfer money, pay electric bills, or buy airtime.\n"
+            f"5. MANDATORY SECURITY & PRIVACY RULE: Before disclosing private account balances or authorizing money transfers/bill payments, ALWAYS ask them to confirm they are in a private space and have their privacy (not in a public place where people can overhear), and tell them that they can punch in their 4-digit PIN on their phone keypad or say it out loud."
         )
 
         try:

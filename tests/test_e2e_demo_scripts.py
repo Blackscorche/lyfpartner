@@ -231,3 +231,48 @@ async def test_scenario_7_new_user_spoken_onboarding_with_bvn():
         assert data["account_number"].startswith("0")
         assert len(data["account_number"]) == 10
         assert "Fatima" in data["full_name"]
+
+@pytest.mark.asyncio
+async def test_scenario_8_conversational_transfer_before_pin():
+    """8. Conversational banking (like managing OPay blindly): caller asks to transfer first, AI prompts for PIN with privacy check, caller enters PIN, AI quotes transfer, caller confirms."""
+    transport = ASGITransport(app=unified_app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # Create session (Aminu Kano)
+        resp = await client.post("/v1/sessions", json={"channel": "web", "caller_id": "+2348000000001", "language": "en-ng"})
+        session_id = resp.json()["session_id"]
+
+        # Step 1: Caller immediately says what they want: "Send 5,000 naira to Musa"
+        turn1 = await client.post("/v1/voice/turn", json={
+            "session_id": session_id,
+            "text_input": "I want to send 5,000 naira to Musa"
+        })
+        assert turn1.status_code == 200
+        t1_data = turn1.json()
+        # System acknowledges intent and prompts for privacy & PIN
+        assert "5,000" in t1_data["reply_text"]
+        assert "Musa" in t1_data["reply_text"]
+        assert "privacy" in t1_data["reply_text"].lower() or "private" in t1_data["reply_text"].lower()
+        assert t1_data["pending_action"]["pending_action_type"] == "transfer"
+
+        # Step 2: Caller inputs 4-digit PIN (keypad or spoken)
+        turn2 = await client.post("/v1/voice/turn", json={
+            "session_id": session_id,
+            "text_input": "1234"
+        })
+        assert turn2.status_code == 200
+        t2_data = turn2.json()
+        assert t2_data["auth_level"] == "basic"
+        # System immediately advances to the transfer quote
+        assert "5,000" in t2_data["reply_text"]
+        assert "Musa" in t2_data["reply_text"]
+        assert t2_data["pending_action"]["action"] == "confirm_transfer"
+
+        # Step 3: Caller confirms transfer
+        turn3 = await client.post("/v1/voice/turn", json={
+            "session_id": session_id,
+            "text_input": "Yes, proceed with transfer"
+        })
+        assert turn3.status_code == 200
+        t3_data = turn3.json()
+        assert t3_data["intent"] == "transfer_completed"
+        assert "successful" in t3_data["reply_text"].lower()

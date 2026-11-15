@@ -11,8 +11,10 @@ export default function InCallScreen({
   isAssistantSpeaking = false,
   isListening = false,
   isMuted = false,
+  quickPhrases = [],
   onEndCall,
   onSendDTMF,
+  onSendTurn,
   onToggleMic
 }) {
   const [isSpeaker, setIsSpeaker] = useState(true)
@@ -109,6 +111,94 @@ export default function InCallScreen({
         language={captionLang}
         isAssistant={isAssistantSpeaking}
       />
+
+      {/* Conversational Action Prompts (Talk to Assistant) */}
+      {!showKeypad && onSendTurn && (
+        <div style={{
+          margin: '6px 0 10px',
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 5,
+          justifyContent: 'center',
+          maxWidth: 290
+        }}>
+          {/* Quick confirmation chips if assistant is awaiting confirmation */}
+          {(captionText.toLowerCase().includes('in tura') ||
+            captionText.toLowerCase().includes('proceed') ||
+            captionText.toLowerCase().includes('confirm') ||
+            captionText.toLowerCase().includes('se kin tesiwaju') ||
+            captionText.toLowerCase().includes('m ga-eziga ya')) ? (
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button
+                onClick={() => onSendTurn(captionLang === 'ha' ? 'I mana, tura shi yanzu' : captionLang === 'yo' ? 'Beeni, tesiwaju' : captionLang === 'ig' ? 'Ee, ziga ya ugbua' : 'Yes, proceed with transfer')}
+                style={{
+                  padding: '5px 12px',
+                  borderRadius: 9999,
+                  background: 'rgba(52, 199, 89, 0.3)',
+                  border: '1px solid #34C759',
+                  color: '#FFFFFF',
+                  fontSize: 11,
+                  fontWeight: 700,
+                  fontFamily: 'var(--font-mono)',
+                  cursor: 'pointer'
+                }}
+              >
+                ✅ Yes, Confirm
+              </button>
+              <button
+                onClick={() => onSendTurn(captionLang === 'ha' ? 'A\'a, soke shi' : captionLang === 'yo' ? 'Rara, fagile e' : captionLang === 'ig' ? 'Mba, kagbuo ya' : 'No, cancel')}
+                style={{
+                  padding: '5px 12px',
+                  borderRadius: 9999,
+                  background: 'rgba(255, 59, 48, 0.3)',
+                  border: '1px solid #FF3B30',
+                  color: '#FFFFFF',
+                  fontSize: 11,
+                  fontWeight: 700,
+                  fontFamily: 'var(--font-mono)',
+                  cursor: 'pointer'
+                }}
+              >
+                ❌ Cancel
+              </button>
+            </div>
+          ) : (
+            quickPhrases && quickPhrases.map((phrase) => (
+              <button
+                key={phrase.id}
+                onClick={() => {
+                  if (phrase.type === 'auth') {
+                    setShowKeypad(true)
+                  }
+                  onSendTurn(phrase.text)
+                }}
+                style={{
+                  padding: '4px 9px',
+                  borderRadius: 9999,
+                  background: 'rgba(255, 255, 255, 0.08)',
+                  border: '1px solid rgba(255, 255, 255, 0.16)',
+                  color: '#FFFFFF',
+                  fontSize: 10.5,
+                  fontFamily: 'var(--font-mono)',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  transition: 'all 0.15s ease'
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(52, 199, 89, 0.22)' }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)' }}
+                title={phrase.translation || phrase.text}
+              >
+                <span style={{ fontSize: 9 }}>
+                  {phrase.type === 'transfer' ? '💸' : phrase.type === 'inquiry' ? '💳' : phrase.type === 'bill' ? '💡' : '🔒'}
+                </span>
+                <span>{phrase.label}</span>
+              </button>
+            ))
+          )}
+        </div>
+      )}
 
       {/* In-Call Keypad Overlay (if opened) */}
       {showKeypad ? (

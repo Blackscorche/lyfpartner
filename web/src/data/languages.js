@@ -15,15 +15,15 @@ export const LANGUAGES = {
       balanceKobo: 25000000,
       balanceFormatted: '₦250,000.00'
     },
-    greeting: 'Sannu! Barka da zuwa Lyfpartner. Don tsaronka, da fatan kana wuri mai natsuwa da sirri ba a cikin jama\'a ba. Za ka iya danna lambar sirrinka a kan keypad, ko kuma ka fadi ta a fili.',
-    greetingTranslation: 'Welcome to Lyfpartner. For your security, hope you are in a private space and have your privacy. Please punch in your 4-digit PIN on the keypad, or say it out loud.',
+    greeting: 'Sannu! Barka da zuwa Lyfpartner. Yaya zan iya taimaka muku yau? Kuna iya duba kudi a asusu, tura kudi ga wani, ko biyan kudin wuta.',
+    greetingTranslation: 'Welcome to Lyfpartner. How can I assist you today? You can check your account balance, transfer money, or pay electricity bills.',
     quickPhrases: [
       {
-        id: 'pin',
-        label: 'Speak PIN: 1-2-3-4',
-        text: 'Lambar sirri na daya biyu uku hudu',
-        translation: 'My PIN is 1-2-3-4',
-        type: 'auth'
+        id: 'transfer',
+        label: 'Transfer ₦5,000 to Musa',
+        text: 'Tura Naira dubu biyar zuwa ga Musa Bello',
+        translation: 'Send 5,000 Naira to Musa Bello',
+        type: 'transfer'
       },
       {
         id: 'bal',
@@ -33,11 +33,18 @@ export const LANGUAGES = {
         type: 'inquiry'
       },
       {
-        id: 'transfer',
-        label: 'Transfer ₦5,000 to Musa',
-        text: 'Tura Naira dubu biyar zuwa ga Musa Bello',
-        translation: 'Send 5,000 Naira to Musa Bello',
-        type: 'transfer'
+        id: 'bill',
+        label: 'Pay Electricity',
+        text: 'Ina son biyan kudin wuta',
+        translation: 'I want to pay electricity bill',
+        type: 'bill'
+      },
+      {
+        id: 'pin',
+        label: 'Keypad PIN: 1234',
+        text: '1234',
+        translation: 'Punch in PIN 1234',
+        type: 'auth'
       }
     ],
     replayEvents: [
@@ -70,15 +77,15 @@ export const LANGUAGES = {
       balanceKobo: 18000000,
       balanceFormatted: '₦180,000.00'
     },
-    greeting: 'Bawo ni! E kaabo si Lyfpartner. Fun aabo re, a lero pe o wa ni aye ikoko ti o ni aabo. Jowo te nomba asiri re lori keypad, tabi ki o so o jade.',
-    greetingTranslation: 'Welcome to Lyfpartner. For your security, hope you are in a private space and have your privacy. Please punch in your 4-digit PIN on the keypad, or say it out loud.',
+    greeting: 'Bawo ni! E kaabo si Lyfpartner. Bawo ni a se le ran yin lowo loni? E le wo iye owo to ku ninu akaunti yin, gbe owo ranse, tabi san owo ina.',
+    greetingTranslation: 'Welcome to Lyfpartner. How can we help you today? You can check your account balance, transfer money, or pay electricity bills.',
     quickPhrases: [
       {
-        id: 'pin',
-        label: 'Speak PIN: 1-2-3-4',
-        text: 'Nomba asiri mi ni okan meji meta merin',
-        translation: 'My PIN is 1-2-3-4',
-        type: 'auth'
+        id: 'transfer',
+        label: 'Transfer ₦5,000',
+        text: 'Mo fe fi Naira egberun marun ranse si Musa Bello',
+        translation: 'Send 5,000 Naira to Musa Bello',
+        type: 'transfer'
       },
       {
         id: 'bal',
@@ -93,6 +100,13 @@ export const LANGUAGES = {
         text: 'Mo fe san owo ina NEPA egberun mefa',
         translation: 'I want to pay 6,000 Naira electricity bill',
         type: 'bill'
+      },
+      {
+        id: 'pin',
+        label: 'Keypad PIN: 1234',
+        text: '1234',
+        translation: 'Punch in PIN 1234',
+        type: 'auth'
       }
     ],
     replayEvents: [
@@ -125,15 +139,15 @@ export const LANGUAGES = {
       balanceKobo: 32000000,
       balanceFormatted: '₦320,000.00'
     },
-    greeting: 'Nnọọ! Nnọọ na Lyfpartner. Maka nchekwa gi, anyi nwere olileanya na ino n\'ebe zoro ezo nwere nchekwa. Biko pia nọmba nzuzo gi na keypad, ma obu kwuo ya n\'olu.',
-    greetingTranslation: 'Welcome to Lyfpartner. For your security, hope you are in a private space and have your privacy. Please punch in your 4-digit PIN on the keypad, or say it out loud.',
+    greeting: 'Nnọọ! Nnọọ na Lyfpartner. Kedu ka m ga-esi nyere gi aka taa? I nwere ike ilele ego fọdụrụ na akaụntụ gi, zipu ego, ma obu kwuo ugwo oku eletrik.',
+    greetingTranslation: 'Welcome to Lyfpartner. How can I help you today? You can check your account balance, send money, or pay electricity bills.',
     quickPhrases: [
       {
-        id: 'pin',
-        label: 'Speak PIN: 1-2-3-4',
-        text: 'Nọmba nzuzo m bu otu abuo ato ano',
-        translation: 'My PIN is 1-2-3-4',
-        type: 'auth'
+        id: 'transfer',
+        label: 'Send ₦10,000 to Chinedu',
+        text: 'Achọrọ m iziga puku naira iri nye Chinedu',
+        translation: 'I want to send 10,000 Naira to Chinedu',
+        type: 'transfer'
       },
       {
         id: 'bal',
@@ -143,11 +157,18 @@ export const LANGUAGES = {
         type: 'inquiry'
       },
       {
-        id: 'transfer',
-        label: 'Send ₦10,000 to Chinedu',
-        text: 'Achọrọ m iziga puku naira iri nye Chinedu',
-        translation: 'I want to send 10,000 Naira to Chinedu',
-        type: 'transfer'
+        id: 'bill',
+        label: 'Pay Electricity',
+        text: 'Achọrọ m ikwu ugwọ ọkụ eletrik',
+        translation: 'I want to pay electricity bill',
+        type: 'bill'
+      },
+      {
+        id: 'pin',
+        label: 'Keypad PIN: 1234',
+        text: '1234',
+        translation: 'Punch in PIN 1234',
+        type: 'auth'
       }
     ],
     replayEvents: [
@@ -180,15 +201,15 @@ export const LANGUAGES = {
       balanceKobo: 41000000,
       balanceFormatted: '₦410,000.00'
     },
-    greeting: 'Welcome to Lyfpartner voice banking. For your security, hope you are in a private space and have your privacy. Please punch in your 4-digit PIN on the keypad, or say it out loud.',
-    greetingTranslation: 'Welcome to Lyfpartner voice banking. For your security, hope you are in a private space and have your privacy. Please punch in your 4-digit PIN on the keypad, or say it out loud.',
+    greeting: 'Hello! Welcome to Lyfpartner Voice Banking. How can I assist you today? You can check your balance, transfer money to anyone, or pay electricity bills.',
+    greetingTranslation: 'Hello! Welcome to Lyfpartner Voice Banking. How can I assist you today? You can check your balance, transfer money to anyone, or pay electricity bills.',
     quickPhrases: [
       {
-        id: 'pin',
-        label: 'Speak PIN: 1-2-3-4',
-        text: 'My PIN is one two three four',
-        translation: 'PIN authorization 1234',
-        type: 'auth'
+        id: 'transfer',
+        label: 'Transfer ₦5,000 to Musa',
+        text: 'Send 5000 naira to Musa Bello right now',
+        translation: 'Instant NIP bank transfer',
+        type: 'transfer'
       },
       {
         id: 'bal',
@@ -198,11 +219,18 @@ export const LANGUAGES = {
         type: 'inquiry'
       },
       {
-        id: 'transfer',
-        label: 'Transfer ₦5,000 to Musa',
-        text: 'Send 5000 naira to Musa Bello right now',
-        translation: 'Instant NIP bank transfer',
-        type: 'transfer'
+        id: 'bill',
+        label: 'Pay Electricity',
+        text: 'I want to pay my IKEDC electricity bill',
+        translation: 'Pay electricity utility bill',
+        type: 'bill'
+      },
+      {
+        id: 'pin',
+        label: 'Keypad PIN: 1234',
+        text: '1234',
+        translation: 'Punch in PIN 1234',
+        type: 'auth'
       }
     ],
     replayEvents: [

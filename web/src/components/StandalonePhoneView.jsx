@@ -548,8 +548,10 @@ export default function StandalonePhoneView({ selectedLanguage = 'ha', onSelectL
               isAssistantSpeaking={isAssistantSpeaking}
               isListening={isListeningMic && !isAssistantSpeaking}
               isMuted={isMuted}
+              quickPhrases={langData.quickPhrases}
               onEndCall={handleEndCall}
               onSendDTMF={handleSendDTMF}
+              onSendTurn={executeTextTurn}
               onToggleMic={handleToggleMute}
             />
           )}

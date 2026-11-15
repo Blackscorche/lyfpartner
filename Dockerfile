@@ -1,5 +1,13 @@
-FROM python:3.11-slim
+# Stage 1: Build Frontend
+FROM node:20-alpine AS frontend-builder
+WORKDIR /web
+COPY web/package*.json ./
+RUN npm install
+COPY web/ ./
+RUN npm run build
 
+# Stage 2: Python Backend
+FROM python:3.11-slim
 WORKDIR /app
 
 # Install system dependencies
@@ -20,6 +28,9 @@ COPY services/ ./services/
 COPY run.py .
 COPY pytest.ini .
 
-EXPOSE 8000 8001 8002 8003 8004 8005 8006 8007 8008 8009
+# Copy built frontend assets from stage 1
+COPY --from=frontend-builder /web/dist ./web/dist
+
+EXPOSE 8000
 
 CMD ["python", "run.py"]
