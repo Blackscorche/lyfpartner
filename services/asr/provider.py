@@ -112,10 +112,28 @@ class GroqWhisperASRProvider(ASRProvider):
         if not self.api_key:
             return await self._mock.transcribe(audio_bytes, language)
 
-        # Ensure we have standard WAV bytes for Groq
-        converted_wav = audio_bytes
-        # If it doesn't start with RIFF (standard WAV header), transcode with ffmpeg
-        if not audio_bytes.startswith(b"RIFF"):
+        # Determine proper extension and content type for Groq Whisper
+        filename = "audio.wav"
+        content_type = "audio/wav"
+        payload = audio_bytes
+
+        if audio_bytes.startswith(b"\x1aE\xdf\xa3"):
+            filename = "audio.webm"
+            content_type = "audio/webm"
+            payload = audio_bytes
+        elif audio_bytes.startswith(b"OggS"):
+            filename = "audio.ogg"
+            content_type = "audio/ogg"
+            payload = audio_bytes
+        elif audio_bytes.startswith(b"ID3") or audio_bytes.startswith(b"\xff\xfb") or audio_bytes.startswith(b"\xff\xf3"):
+            filename = "audio.mp3"
+            content_type = "audio/mpeg"
+            payload = audio_bytes
+        elif audio_bytes.startswith(b"RIFF"):
+            filename = "audio.wav"
+            content_type = "audio/wav"
+            payload = audio_bytes
+        else:
             try:
                 import subprocess
                 proc = subprocess.Popen(
@@ -126,9 +144,13 @@ class GroqWhisperASRProvider(ASRProvider):
                 )
                 out, _ = proc.communicate(input=audio_bytes, timeout=4)
                 if out and len(out) > 100:
-                    converted_wav = out
+                    payload = out
+                    filename = "audio.wav"
+                    content_type = "audio/wav"
             except Exception:
-                pass
+                payload = audio_bytes
+                filename = "audio.webm"
+                content_type = "audio/webm"
 
         try:
             import httpx
@@ -144,7 +166,7 @@ class GroqWhisperASRProvider(ASRProvider):
 
             async with httpx.AsyncClient(timeout=8.0) as client:
                 files = {
-                    "file": ("audio.wav", converted_wav, "audio/wav")
+                    "file": (filename, payload, content_type)
                 }
                 data = {
                     "model": "whisper-large-v3-turbo",

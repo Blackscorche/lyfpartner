@@ -646,10 +646,8 @@ export default function StageView({
                 captionText={captionText}
                 captionLang={captionLang}
                 isAssistantSpeaking={isAssistantSpeaking}
-                quickPhrases={langData.quickPhrases}
                 onEndCall={handleEndCall}
                 onSendDTMF={handleSendDTMF}
-                onSendTurn={(text) => handleSimulatePhrase({ text, type: text === '1234' ? 'auth' : 'inquiry' })}
               />
             )}
 
