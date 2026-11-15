@@ -210,7 +210,7 @@ export default function AdminCallDetail({ sessionId }) {
                           gap: 4
                         }}>
                           {t.speaker === 'caller' ? <UserIcon size={11} color="var(--color-ink)" /> : <BotIcon size={11} color="var(--color-accent-green)" />}
-                          <span>{t.speaker === 'caller' ? 'CALLER' : 'LYFPATNER ASSISTANT'}</span>
+                          <span>{t.speaker === 'caller' ? 'CALLER' : 'LYFPARTNER ASSISTANT'}</span>
                         </span>
                         <span style={{ fontSize: 10, color: 'var(--color-ink-tertiary)' }}>
                           {new Date(t.time).toLocaleTimeString('en-GB')}

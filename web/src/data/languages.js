@@ -1,5 +1,5 @@
 /**
- * Lyfpatner Multilingual Intelligence Catalog
+ * Lyfpartner Multilingual Intelligence Catalog
  * Full scenario prompts and replay flows for Hausa, Yoruba, Igbo, and Nigerian English.
  */
 
@@ -15,8 +15,8 @@ export const LANGUAGES = {
       balanceKobo: 25000000,
       balanceFormatted: '₦250,000.00'
     },
-    greeting: 'Sannu! Barka da zuwa Lyfpatner. Don Allah fadi lambar sirrinka.',
-    greetingTranslation: 'Hello! Welcome to Lyfpatner. Please speak your 4-digit PIN.',
+    greeting: 'Sannu! Barka da zuwa Lyfpartner. Don tsaronka, da fatan kana wuri mai natsuwa da sirri ba a cikin jama\'a ba. Za ka iya danna lambar sirrinka a kan keypad, ko kuma ka fadi ta a fili.',
+    greetingTranslation: 'Welcome to Lyfpartner. For your security, hope you are in a private space and have your privacy. Please punch in your 4-digit PIN on the keypad, or say it out loud.',
     quickPhrases: [
       {
         id: 'pin',
@@ -42,7 +42,7 @@ export const LANGUAGES = {
     ],
     replayEvents: [
       { timeMs: 0, type: 'call.started', data: { session_id: 'sess_ha_01', caller_id: '+2348000000001', channel: 'telephony' } },
-      { timeMs: 1000, type: 'agent.reply', data: { speaker: 'assistant', language: 'ha', text: 'Sannu! Barka da zuwa Lyfpatner. Don Allah fadi lambar sirrinka.', stage: 'TTS', latencyMs: 180 } },
+      { timeMs: 1000, type: 'agent.reply', data: { speaker: 'assistant', language: 'ha', text: 'Sannu! Barka da zuwa Lyfpartner. Don tsaronka, da fatan kana wuri mai natsuwa da sirri ba a cikin jama\'a ba. Za ka iya danna lambar sirrinka a kan keypad, ko kuma ka fadi ta a fili.', stage: 'TTS', latencyMs: 180 } },
       { timeMs: 3200, type: 'asr.final', data: { speaker: 'caller', language: 'ha', text: 'Daya biyu uku hudu (1234)', confidence: 0.98, latencyMs: 220 } },
       { timeMs: 3900, type: 'auth.update', data: { pin_verified: true, voice_match_score: 0.96, auth_level: 'full', status: 'UNLOCKED' } },
       { timeMs: 4800, type: 'agent.reply', data: { speaker: 'assistant', language: 'ha', text: 'An tabbatar da lambar sirri. Yaya zan iya taimaka muku yau?', stage: 'TTS', latencyMs: 160 } },
@@ -55,7 +55,7 @@ export const LANGUAGES = {
       { timeMs: 16000, type: 'asr.final', data: { speaker: 'caller', language: 'ha', text: 'I mana, tura shi yanzu', confidence: 0.99, latencyMs: 180 } },
       { timeMs: 16800, type: 'transfer.confirmed', data: { reference: 'NIP-20261114-8831', recipient: 'Musa Bello', bank: 'First Bank', amount_naira: 5000, status: 'SETTLED' } },
       { timeMs: 17600, type: 'agent.reply', data: { speaker: 'assistant', language: 'ha', text: 'An tura Naira 5,000 ga Musa Bello cikin nasara. An aiko muku da sakon SMS na biyan kudi.', stage: 'TTS', latencyMs: 180 } },
-      { timeMs: 20500, type: 'call.ended', data: { duration_seconds: 21, turn_count: 5, outcome: 'completed', sms_receipt: 'Lyfpatner Debit: NGN 5,000.00 to Musa Bello. Ref: NIP-20261114-8831. Bal: NGN 244,990.00' } }
+      { timeMs: 20500, type: 'call.ended', data: { duration_seconds: 21, turn_count: 5, outcome: 'completed', sms_receipt: 'Lyfpartner Debit: NGN 5,000.00 to Musa Bello. Ref: NIP-20261114-8831. Bal: NGN 244,990.00' } }
     ]
   },
 
@@ -70,8 +70,8 @@ export const LANGUAGES = {
       balanceKobo: 18000000,
       balanceFormatted: '₦180,000.00'
     },
-    greeting: 'Bawo ni! E kaabo si Lyfpatner. E jowo so nomba asiri yin.',
-    greetingTranslation: 'Hello! Welcome to Lyfpatner. Please state your secret PIN.',
+    greeting: 'Bawo ni! E kaabo si Lyfpartner. Fun aabo re, a lero pe o wa ni aye ikoko ti o ni aabo. Jowo te nomba asiri re lori keypad, tabi ki o so o jade.',
+    greetingTranslation: 'Welcome to Lyfpartner. For your security, hope you are in a private space and have your privacy. Please punch in your 4-digit PIN on the keypad, or say it out loud.',
     quickPhrases: [
       {
         id: 'pin',
@@ -97,7 +97,7 @@ export const LANGUAGES = {
     ],
     replayEvents: [
       { timeMs: 0, type: 'call.started', data: { session_id: 'sess_yo_02', caller_id: '+2348000000002', channel: 'telephony' } },
-      { timeMs: 1000, type: 'agent.reply', data: { speaker: 'assistant', language: 'yo', text: 'Bawo ni! E kaabo si Lyfpatner. E jowo so nomba asiri yin.', stage: 'TTS', latencyMs: 175 } },
+      { timeMs: 1000, type: 'agent.reply', data: { speaker: 'assistant', language: 'yo', text: 'Bawo ni! E kaabo si Lyfpartner. Fun aabo re, a lero pe o wa ni aye ikoko ti o ni aabo. Jowo te nomba asiri re lori keypad, tabi ki o so o jade.', stage: 'TTS', latencyMs: 175 } },
       { timeMs: 3200, type: 'asr.final', data: { speaker: 'caller', language: 'yo', text: 'Okan meji meta merin (1234)', confidence: 0.98, latencyMs: 220 } },
       { timeMs: 3900, type: 'auth.update', data: { pin_verified: true, voice_match_score: 0.95, auth_level: 'full', status: 'UNLOCKED' } },
       { timeMs: 4800, type: 'agent.reply', data: { speaker: 'assistant', language: 'yo', text: 'A ti fowo si nomba asiri yin. Bawo ni a se le ran yin lowo loni?', stage: 'TTS', latencyMs: 165 } },
@@ -110,7 +110,7 @@ export const LANGUAGES = {
       { timeMs: 16000, type: 'asr.final', data: { speaker: 'caller', language: 'yo', text: 'Beeni, san owo ina na', confidence: 0.99, latencyMs: 180 } },
       { timeMs: 16800, type: 'transfer.confirmed', data: { reference: 'BILL-20261114-4902', recipient: 'IKEDC Ikeja Electric', bank: 'Utility Payment', amount_naira: 6000, status: 'SETTLED' } },
       { timeMs: 17600, type: 'agent.reply', data: { speaker: 'assistant', language: 'yo', text: 'A ti san owo ina NEPA egberun mefa Naira laseyori. E o gba SMS re nisisiyi.', stage: 'TTS', latencyMs: 180 } },
-      { timeMs: 20500, type: 'call.ended', data: { duration_seconds: 21, turn_count: 5, outcome: 'completed', sms_receipt: 'Lyfpatner Bill Paid: NGN 6,000.00 to IKEDC. Token: 4920-1849-2910-4821. Bal: NGN 173,990.00' } }
+      { timeMs: 20500, type: 'call.ended', data: { duration_seconds: 21, turn_count: 5, outcome: 'completed', sms_receipt: 'Lyfpartner Bill Paid: NGN 6,000.00 to IKEDC. Token: 4920-1849-2910-4821. Bal: NGN 173,990.00' } }
     ]
   },
 
@@ -125,8 +125,8 @@ export const LANGUAGES = {
       balanceKobo: 32000000,
       balanceFormatted: '₦320,000.00'
     },
-    greeting: 'Nnọọ! Nnọọ na Lyfpatner. Biko kwuo nọmba nzuzo gi.',
-    greetingTranslation: 'Welcome! Welcome to Lyfpatner. Please speak your secret PIN.',
+    greeting: 'Nnọọ! Nnọọ na Lyfpartner. Maka nchekwa gi, anyi nwere olileanya na ino n\'ebe zoro ezo nwere nchekwa. Biko pia nọmba nzuzo gi na keypad, ma obu kwuo ya n\'olu.',
+    greetingTranslation: 'Welcome to Lyfpartner. For your security, hope you are in a private space and have your privacy. Please punch in your 4-digit PIN on the keypad, or say it out loud.',
     quickPhrases: [
       {
         id: 'pin',
@@ -152,7 +152,7 @@ export const LANGUAGES = {
     ],
     replayEvents: [
       { timeMs: 0, type: 'call.started', data: { session_id: 'sess_ig_03', caller_id: '+2348000000003', channel: 'telephony' } },
-      { timeMs: 1000, type: 'agent.reply', data: { speaker: 'assistant', language: 'ig', text: 'Nnọọ! Nnọọ na Lyfpatner. Biko kwuo nọmba nzuzo gi.', stage: 'TTS', latencyMs: 180 } },
+      { timeMs: 1000, type: 'agent.reply', data: { speaker: 'assistant', language: 'ig', text: 'Nnọọ! Nnọọ na Lyfpartner. Maka nchekwa gi, anyi nwere olileanya na ino n\'ebe zoro ezo nwere nchekwa. Biko pia nọmba nzuzo gi na keypad, ma obu kwuo ya n\'olu.', stage: 'TTS', latencyMs: 180 } },
       { timeMs: 3200, type: 'asr.final', data: { speaker: 'caller', language: 'ig', text: 'Otu abuo ato ano (1234)', confidence: 0.98, latencyMs: 220 } },
       { timeMs: 3900, type: 'auth.update', data: { pin_verified: true, voice_match_score: 0.97, auth_level: 'full', status: 'UNLOCKED' } },
       { timeMs: 4800, type: 'agent.reply', data: { speaker: 'assistant', language: 'ig', text: 'A kwadoro nọmba nzuzo gi. Kedu ka m ga-esi nyere gi aka taa?', stage: 'TTS', latencyMs: 165 } },
@@ -165,7 +165,7 @@ export const LANGUAGES = {
       { timeMs: 16000, type: 'asr.final', data: { speaker: 'caller', language: 'ig', text: 'Ee, ziga ya ugbua', confidence: 0.99, latencyMs: 180 } },
       { timeMs: 16800, type: 'transfer.confirmed', data: { reference: 'NIP-20261114-9912', recipient: 'Chinedu Obi', bank: 'Access Bank', amount_naira: 10000, status: 'SETTLED' } },
       { timeMs: 17600, type: 'agent.reply', data: { speaker: 'assistant', language: 'ig', text: 'Ezila ₦10,000 nye Chinedu Obi nke ọma. Anyị ezigala ozi SMS nnabata.', stage: 'TTS', latencyMs: 180 } },
-      { timeMs: 20500, type: 'call.ended', data: { duration_seconds: 21, turn_count: 5, outcome: 'completed', sms_receipt: 'Lyfpatner Debit: NGN 10,000.00 to Chinedu Obi. Ref: NIP-20261114-9912. Bal: NGN 309,990.00' } }
+      { timeMs: 20500, type: 'call.ended', data: { duration_seconds: 21, turn_count: 5, outcome: 'completed', sms_receipt: 'Lyfpartner Debit: NGN 10,000.00 to Chinedu Obi. Ref: NIP-20261114-9912. Bal: NGN 309,990.00' } }
     ]
   },
 
@@ -180,8 +180,8 @@ export const LANGUAGES = {
       balanceKobo: 41000000,
       balanceFormatted: '₦410,000.00'
     },
-    greeting: 'Welcome to Lyfpatner voice banking. Please speak your 4-digit PIN.',
-    greetingTranslation: 'Welcome to Lyfpatner voice banking. Please speak your 4-digit PIN.',
+    greeting: 'Welcome to Lyfpartner voice banking. For your security, hope you are in a private space and have your privacy. Please punch in your 4-digit PIN on the keypad, or say it out loud.',
+    greetingTranslation: 'Welcome to Lyfpartner voice banking. For your security, hope you are in a private space and have your privacy. Please punch in your 4-digit PIN on the keypad, or say it out loud.',
     quickPhrases: [
       {
         id: 'pin',
@@ -207,7 +207,7 @@ export const LANGUAGES = {
     ],
     replayEvents: [
       { timeMs: 0, type: 'call.started', data: { session_id: 'sess_en_04', caller_id: '+2348000000004', channel: 'telephony' } },
-      { timeMs: 1000, type: 'agent.reply', data: { speaker: 'assistant', language: 'en', text: 'Welcome to Lyfpatner voice banking. Please speak your 4-digit PIN.', stage: 'TTS', latencyMs: 170 } },
+      { timeMs: 1000, type: 'agent.reply', data: { speaker: 'assistant', language: 'en', text: 'Welcome to Lyfpartner voice banking. For your security, hope you are in a private space and have your privacy. Please punch in your 4-digit PIN on the keypad, or say it out loud.', stage: 'TTS', latencyMs: 170 } },
       { timeMs: 3200, type: 'asr.final', data: { speaker: 'caller', language: 'en', text: 'One two three four (1234)', confidence: 0.99, latencyMs: 210 } },
       { timeMs: 3900, type: 'auth.update', data: { pin_verified: true, voice_match_score: 0.98, auth_level: 'full', status: 'UNLOCKED' } },
       { timeMs: 4800, type: 'agent.reply', data: { speaker: 'assistant', language: 'en', text: 'PIN verified successfully. How can I help you today?', stage: 'TTS', latencyMs: 155 } },
@@ -220,7 +220,7 @@ export const LANGUAGES = {
       { timeMs: 16000, type: 'asr.final', data: { speaker: 'caller', language: 'en', text: 'Yes, confirm the transfer', confidence: 0.99, latencyMs: 175 } },
       { timeMs: 16800, type: 'transfer.confirmed', data: { reference: 'NIP-20261114-7740', recipient: 'Musa Bello', bank: 'First Bank', amount_naira: 5000, status: 'SETTLED' } },
       { timeMs: 17600, type: 'agent.reply', data: { speaker: 'assistant', language: 'en', text: '₦5,000 has been transferred to Musa Bello successfully. SMS receipt sent.', stage: 'TTS', latencyMs: 175 } },
-      { timeMs: 20500, type: 'call.ended', data: { duration_seconds: 21, turn_count: 5, outcome: 'completed', sms_receipt: 'Lyfpatner Debit: NGN 5,000.00 to Musa Bello. Ref: NIP-20261114-7740. Bal: NGN 404,990.00' } }
+      { timeMs: 20500, type: 'call.ended', data: { duration_seconds: 21, turn_count: 5, outcome: 'completed', sms_receipt: 'Lyfpartner Debit: NGN 5,000.00 to Musa Bello. Ref: NIP-20261114-7740. Bal: NGN 404,990.00' } }
     ]
   }
 }

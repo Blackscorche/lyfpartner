@@ -111,7 +111,7 @@ export default function AuthState({
           </span>
         </div>
 
-        {/* Spoken PIN Card */}
+        {/* PIN Verification Card (Keypad DTMF or Spoken Voice) */}
         <div style={{
           background: 'var(--bg-paper-surface)',
           border: '1px solid var(--color-border-subtle)',
@@ -121,7 +121,7 @@ export default function AuthState({
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontSize: 9.5, color: 'var(--color-ink-tertiary)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.8 }}>
-              SPOKEN PIN (ARGON2)
+              PIN AUTH (KEYPAD / VOICE)
             </span>
             {pinVerified ? (
               <CheckIcon size={13} color="var(--color-accent-green)" />
@@ -149,7 +149,7 @@ export default function AuthState({
             </span>
           </div>
           <span style={{ fontSize: 10.5, color: 'var(--color-ink-tertiary)', display: 'block', marginTop: 3 }}>
-            Speech normalized hash
+            DTMF keypad & spoken voice hash
           </span>
         </div>
 

@@ -372,9 +372,14 @@ export default function StandalonePhoneView({ selectedLanguage = 'ha', onSelectL
     }
   }
 
-  const handleSendDTMF = async (digit) => {
-    playDTMF(digit)
-    await executeTextTurn(digit)
+  const handleSendDTMF = async (digits) => {
+    if (typeof digits === 'string' && digits.length > 1) {
+      playDTMF(digits[digits.length - 1])
+      await executeTextTurn(digits)
+    } else {
+      playDTMF(digits)
+      await executeTextTurn(digits)
+    }
   }
 
   const handleToggleMute = () => {

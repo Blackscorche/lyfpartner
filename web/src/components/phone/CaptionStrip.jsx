@@ -34,7 +34,7 @@ export default function CaptionStrip({ text, language = 'ha', isAssistant = fals
             {langTag}
           </span>
           <span style={{ fontSize: 11, fontWeight: 600, color: '#A1A1A6' }}>
-            {isAssistant ? 'Lyfpatner Voice' : 'Caller'}
+            {isAssistant ? 'Lyfpartner Voice' : 'Caller'}
           </span>
         </div>
         <span style={{ fontSize: 9.5, color: '#636366', fontWeight: 500 }}>

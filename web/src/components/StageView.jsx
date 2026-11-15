@@ -185,7 +185,7 @@ export default function StageView({
     // Default receipt if none generated yet
     if (!smsReceiptText) {
       const langData = LANGUAGES[captionLang] || LANGUAGES.ha
-      setSmsReceiptText(`Lyfpatner Debit: NGN 5,000.00 to Musa Bello. Ref: NIP-20261114-8831. Bal: ${langData.caller.balanceFormatted}`)
+      setSmsReceiptText(`Lyfpartner Debit: NGN 5,000.00 to Musa Bello. Ref: NIP-20261114-8831. Bal: ${langData.caller.balanceFormatted}`)
     }
   }
 
@@ -601,7 +601,7 @@ export default function StageView({
                 color: '#FFFFFF'
               }}>
                 <div style={{ textAlign: 'center', marginTop: 24 }}>
-                  <h2 style={{ fontSize: 26, fontWeight: 400, margin: '0 0 4px', fontFamily: 'var(--font-sans)' }}>Lyfpatner</h2>
+                  <h2 style={{ fontSize: 26, fontWeight: 400, margin: '0 0 4px', fontFamily: 'var(--font-sans)' }}>Lyfpartner</h2>
                   <p style={{ fontSize: 14, color: '#8E8E93', margin: 0 }}>calling 333 (toll-free)...</p>
                 </div>
 

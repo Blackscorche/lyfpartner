@@ -57,7 +57,7 @@ export default function Dialer({ onCall }) {
         </div>
         {number === '333' && (
           <span style={{ fontSize: 11, color: '#34C759', fontWeight: 600 }}>
-            Lyfpatner Toll-Free Hotline
+            Lyfpartner Toll-Free Hotline
           </span>
         )}
       </div>

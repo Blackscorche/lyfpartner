@@ -67,7 +67,7 @@ export default function FeaturePhone({
         <div style={{ textAlign: 'center' }}>
           {inCall ? (
             <>
-              <div style={{ fontSize: 16, fontWeight: 900, letterSpacing: 0.5 }}>LYFPATNER</div>
+              <div style={{ fontSize: 16, fontWeight: 900, letterSpacing: 0.5 }}>LYFPARTNER</div>
               <div style={{ fontSize: 11, fontWeight: 700, marginTop: 2 }}>TIME: {formatTimer(callDuration)}</div>
             </>
           ) : (

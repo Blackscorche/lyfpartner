@@ -207,7 +207,7 @@ export default function TranscriptView({ entries = [] }) {
                         textTransform: 'uppercase',
                         letterSpacing: 0.5
                       }}>
-                        {isCaller ? 'Caller (Customer)' : 'Lyfpatner AI Voice'}
+                        {isCaller ? 'Caller (Customer)' : 'Lyfpartner AI Voice'}
                       </span>
 
                       <span style={{

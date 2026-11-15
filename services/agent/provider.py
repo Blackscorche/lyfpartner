@@ -69,6 +69,33 @@ class MockLLMProvider(LLMProvider):
                 intent="repeat_last"
             )
 
+        # 2b. Rule: PIN Verification or PIN Inquiry Request
+        if any(w in text for w in ["pin", "password", "secret number", "lambar sirri", "nomba asiri", "nomba nzuzo"]) and not re.search(r'\b\d{4}\b', text):
+            pin_inquiry_replies = {
+                Language.HAUSA: "Don tsaronka, da fatan kana wuri mai natsuwa da sirri ba a cikin jama'a ba. Za ka iya danna lambar sirrinka ta PIN a kan keypad ko kuma ka fadi ta a fili.",
+                Language.IGBO: "Maka nchekwa gi, anyi nwere olileanya na ino n'ebe zoro ezo nwere nchekwa. Biko pia nomba nzuzo PIN gi na keypad ma obu kwuo ya n'olu.",
+                Language.YORUBA: "Fun aabo re, a lero pe o wa ni aye ikoko ti o ni aabo. Jowo te nomba asiri PIN re lori keypad tabi ki o so o jade.",
+                Language.NIGERIAN_ENGLISH: "For your security, hope you are in a private space and have your privacy. Please punch in your 4-digit PIN on the keypad, or say it out loud."
+            }
+            return AgentRespondResponse(
+                reply_text=pin_inquiry_replies.get(lang, pin_inquiry_replies[Language.NIGERIAN_ENGLISH]),
+                intent="pin_privacy_prompt"
+            )
+
+        # 2c. Rule: 4-digit PIN submitted
+        digits_match = re.findall(r'\b\d{4}\b', text)
+        if digits_match or text.strip() in ["1234", "1 2 3 4"]:
+            pin_success_replies = {
+                Language.HAUSA: "An tabbatar da lambar sirri cikin nasara. Yaya zan iya taimaka muku yau?",
+                Language.IGBO: "A kwadoro nomba nzuzo gi nke oma. Kedu ka m ga-esi nyere gi aka taa?",
+                Language.YORUBA: "A ti fowo si nomba asiri yin laseyori. Bawo ni a se le ran yin lowo loni?",
+                Language.NIGERIAN_ENGLISH: "PIN verified successfully. How can I help you today?"
+            }
+            return AgentRespondResponse(
+                reply_text=pin_success_replies.get(lang, pin_success_replies[Language.NIGERIAN_ENGLISH]),
+                intent="pin_verified"
+            )
+
         # 3. Rule: Distress words or explicit request for human -> escalate
         if any(w in text for w in DISTRESS_KEYWORDS):
             res = await tools.escalate_to_human(req.session_id, reason="Caller distress or human agent requested", summary=text)
@@ -334,7 +361,8 @@ class GroqLLMProvider(LLMProvider):
             f"1. Respond directly in {lang_name} in a warm, polite, natural voice.\n"
             f"2. Keep it to 1-2 spoken sentences maximum. Do NOT use markdown, asterisks, or lists.\n"
             f"3. Account context: Caller balance is Naira 250,000.00. Common beneficiary is Musa Bello.\n"
-            f"4. If they ask about services, state they can check balance, transfer money, pay electric bills, or buy airtime."
+            f"4. If they ask about services, state they can check balance, transfer money, pay electric bills, or buy airtime.\n"
+            f"5. MANDATORY SECURITY & PRIVACY RULE: Whenever asking the caller for their PIN or discussing authentication, ALWAYS ask them to confirm they are in a private space and have their privacy (not in a public place where people can overhear), and tell them that they can punch in their 4-digit PIN on their phone keypad or say it out loud."
         )
 
         try:

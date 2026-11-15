@@ -54,7 +54,7 @@ export default function LockScreen({ onUnlock }) {
         </h1>
       </div>
 
-      {/* Lyfpatner Service Notification Card */}
+      {/* Lyfpartner Service Notification Card */}
       <div style={{
         width: '100%',
         background: 'rgba(255, 255, 255, 0.12)',
@@ -81,7 +81,7 @@ export default function LockScreen({ onUnlock }) {
             }}>
               ₦
             </div>
-            <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: -0.1 }}>Lyfpatner Voice</span>
+            <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: -0.1 }}>Lyfpartner Voice</span>
           </div>
           <span style={{ fontSize: 11, opacity: 0.6 }}>now</span>
         </div>

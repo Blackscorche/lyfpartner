@@ -1,5 +1,5 @@
 /**
- * Web Audio API Engine for Lyfpatner:
+ * Web Audio API Engine for Lyfpartner:
  * - Accurate Dual-Tone Multi-Frequency (DTMF) synthesis
  * - Telecom Ringback tone (440Hz + 480Hz modulated cadence)
  * - Microphone & audio stream AnalyserNode for the real-time waveform

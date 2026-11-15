@@ -15,7 +15,7 @@
     "data": {
       "speaker": "assistant",
       "language": "ha",
-      "text": "Sannu! Barka da zuwa Lyfpatner. Don Allah ku fadi lambar sirri ku.",
+      "text": "Sannu! Barka da zuwa Lyfpartner. Don Allah ku fadi lambar sirri ku.",
       "stage": "TTS",
       "latencyMs": 180
     }
@@ -168,7 +168,7 @@
       "duration_seconds": 23,
       "turn_count": 5,
       "outcome": "completed",
-      "sms_receipt": "Lyfpatner Debit: NGN 5,000.00 to Musa Bello. Ref: NIP-20261114-8831. Bal: NGN 244,990.00"
+      "sms_receipt": "Lyfpartner Debit: NGN 5,000.00 to Musa Bello. Ref: NIP-20261114-8831. Bal: NGN 244,990.00"
     }
   }
 ]

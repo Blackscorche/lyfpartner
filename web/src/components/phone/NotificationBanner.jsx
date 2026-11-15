@@ -66,7 +66,7 @@ export default function NotificationBanner({ message, onOpen }) {
         WebkitBoxOrient: 'vertical',
         overflow: 'hidden'
       }}>
-        {message || 'Lyfpatner Debit: NGN 5,000.00 to Musa Bello. Ref: NIP-20261114-8831. Bal: NGN 244,990.00'}
+        {message || 'Lyfpartner Debit: NGN 5,000.00 to Musa Bello. Ref: NIP-20261114-8831. Bal: NGN 244,990.00'}
       </p>
     </div>
   )

@@ -27,8 +27,17 @@ export default function InCallScreen({
 
   const handleKeypadDigit = (digit) => {
     playDTMF(digit)
-    setTypedDigits(prev => prev + digit)
-    if (onSendDTMF) {
+    const nextDigits = typedDigits + digit
+    setTypedDigits(nextDigits)
+    if (nextDigits.length === 4) {
+      if (onSendDTMF) {
+        onSendDTMF(nextDigits)
+      }
+      setTimeout(() => {
+        setTypedDigits('')
+        setShowKeypad(false)
+      }, 600)
+    } else if (onSendDTMF) {
       onSendDTMF(digit)
     }
   }
@@ -47,15 +56,15 @@ export default function InCallScreen({
       boxSizing: 'border-box'
     }}>
       {/* Top Caller Header */}
-      <div style={{ textAlign: 'center', marginTop: 16 }}>
+      <div style={{ textAlign: 'center', marginTop: 12 }}>
         <h2 style={{
-          fontSize: 27,
+          fontSize: 26,
           fontWeight: 400,
           letterSpacing: -0.5,
           margin: 0,
           fontFamily: 'var(--font-sans)'
         }}>
-          Lyfpatner
+          Lyfpartner
         </h2>
         <span style={{ fontSize: 13, color: '#8E8E93', display: 'block', marginTop: 2 }}>
           333 &bull; Toll-Free
@@ -66,10 +75,27 @@ export default function InCallScreen({
           fontFamily: 'var(--font-mono)',
           color: '#34C759',
           display: 'block',
-          marginTop: 4
+          marginTop: 3
         }}>
           {formatTimer(callDuration)}
         </span>
+
+        {/* Privacy Notice Pill */}
+        <div style={{
+          margin: '6px auto 0',
+          padding: '3px 10px',
+          background: 'rgba(255, 255, 255, 0.08)',
+          borderRadius: '9999px',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 5,
+          border: '1px solid rgba(255, 255, 255, 0.14)'
+        }}>
+          <span style={{ fontSize: 10 }}>🔒</span>
+          <span style={{ fontSize: 9.5, color: '#D1D5DB', fontFamily: 'var(--font-mono)' }}>
+            Ensure privacy &bull; Keypad or voice PIN
+          </span>
+        </div>
       </div>
 
       {/* Center: Live Waveform Visualizer */}
@@ -103,8 +129,11 @@ export default function InCallScreen({
           border: '1px solid rgba(255, 255, 255, 0.12)'
         }}>
           <div style={{ textAlign: 'center', height: 28 }}>
-            <span style={{ fontSize: 22, fontFamily: 'var(--font-mono)', letterSpacing: 2 }}>
-              {typedDigits}
+            <span style={{ fontSize: 11, color: '#34C759', fontFamily: 'var(--font-mono)', fontWeight: 700, display: 'block', marginBottom: 2 }}>
+              4-DIGIT PIN (KEYPAD OR VOICE)
+            </span>
+            <span style={{ fontSize: 20, fontFamily: 'var(--font-mono)', letterSpacing: 4, color: '#FFFFFF' }}>
+              {typedDigits ? typedDigits.replace(/./g, '• ') : '_ _ _ _'}
             </span>
           </div>
 

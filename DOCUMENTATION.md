@@ -83,9 +83,10 @@ Unlike typical voice apps that force users to tap buttons for every turn, Lyfpar
 ```mermaid
 stateDiagram-v2
     [*] --> Unauthenticated: Call Dialed (333)
-    Unauthenticated --> Tier1_Inquiry: Query Balance / Rates
-    Tier1_Inquiry --> Auth_Required: Request Transfer / Airtime
-    Auth_Required --> Verified_Basic: 4-Digit Spoken PIN Verified
+    Unauthenticated --> Privacy_Check: Prompt with Privacy Warning
+    Privacy_Check --> Keypad_Or_Voice_PIN: "Ensure private space: Punch or Speak PIN"
+    Keypad_Or_Voice_PIN --> Verified_Basic: 4-Digit Spoken or Keypad PIN Verified
+    Verified_Basic --> Tier1_Inquiry: Query Balance / Rates
     Verified_Basic --> Pending_Confirmation: Quotes Transfer (e.g. N5,000 to Musa)
     Pending_Confirmation --> Transaction_Executed: "Yes / Proceed / Oya"
     Transaction_Executed --> SMS_Dispatched: NIP Reference Generated
@@ -93,9 +94,10 @@ stateDiagram-v2
 ```
 
 ### Security Safeguards
-1. **Multi-Factor Elevation**: Balance queries are public; money transfers, bill payments, and airtime top-ups require explicit 4-digit spoken PIN verification.
-2. **Deterministic Banking Overrides**: While general chit-chat and explanations are handled by the LLM, critical monetary actions (balance deduction, PIN verification, NIP transaction reference generation) are hard-gated by strict deterministic rules.
-3. **Two-Step Affirmation**: Critical money movement mandates explicit verbal confirmation before the ledger executes the debit.
+1. **Eavesdropping Prevention (Privacy-First Prompting)**: Before requesting any security credential, the AI assistant prompts the caller: *"For your security, hope you are in a private space and have your privacy. Please punch in your 4-digit PIN on the keypad, or say it out loud."* If in public, the caller uses the phone keypad to keep credentials confidential.
+2. **Multi-Factor Elevation**: Balance queries are public or Tier 1; money transfers, bill payments, and airtime top-ups require explicit 4-digit PIN verification.
+3. **Deterministic Banking Overrides**: While conversational chit-chat is handled by the Groq LLM, critical monetary actions (balance deduction, PIN verification, NIP transaction reference generation) are hard-gated by strict deterministic Python rules. The LLM can never hallucinate money movement.
+4. **Two-Step Affirmation**: Critical money movement mandates explicit verbal confirmation before the ledger executes the debit.
 
 ---
 

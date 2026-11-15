@@ -44,7 +44,7 @@ export default function MessagesView({ message, onBack }) {
           }}>
             333
           </div>
-          <span style={{ fontSize: 11, color: '#8E8E93' }}>Lyfpatner Bank</span>
+          <span style={{ fontSize: 11, color: '#8E8E93' }}>Lyfpartner Bank</span>
         </div>
 
         <div style={{ width: 50 }} />
@@ -68,7 +68,7 @@ export default function MessagesView({ message, onBack }) {
         fontFamily: 'var(--font-mono)'
       }}>
         <p style={{ margin: 0 }}>
-          {message || 'Lyfpatner Debit: NGN 5,000.00 to Musa Bello. Ref: NIP-20261114-8831. Bal: NGN 244,990.00'}
+          {message || 'Lyfpartner Debit: NGN 5,000.00 to Musa Bello. Ref: NIP-20261114-8831. Bal: NGN 244,990.00'}
         </p>
       </div>
 
