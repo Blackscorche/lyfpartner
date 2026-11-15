@@ -36,9 +36,7 @@ export default function InCallScreen({
       setTimeout(() => {
         setTypedDigits('')
         setShowKeypad(false)
-      }, 600)
-    } else if (onSendDTMF) {
-      onSendDTMF(digit)
+      }, 500)
     }
   }
 

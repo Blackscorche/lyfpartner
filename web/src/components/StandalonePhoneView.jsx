@@ -42,6 +42,8 @@ export default function StandalonePhoneView({ selectedLanguage = 'en', onSelectL
   const audioContextRef = useRef(null)
   const animFrameRef = useRef(null)
   const speechRecognitionRef = useRef(null)
+  const hasNativeSpeechRef = useRef(false)
+  const isProcessingTurnRef = useRef(false)
   const speechTrackerRef = useRef({
     isSpeaking: false,
     silenceStartTime: 0,
@@ -91,12 +93,14 @@ export default function StandalonePhoneView({ selectedLanguage = 'en', onSelectL
     const safetyTimer = setTimeout(() => {
       setIsAssistantSpeaking(false)
       isAssistantSpeakingRef.current = false
+      isProcessingTurnRef.current = false
     }, 8000)
 
     const onDone = () => {
       clearTimeout(safetyTimer)
       setIsAssistantSpeaking(false)
       isAssistantSpeakingRef.current = false
+      isProcessingTurnRef.current = false
     }
 
     if (replyAudioBase64) {
@@ -112,12 +116,19 @@ export default function StandalonePhoneView({ selectedLanguage = 'en', onSelectL
 
   const executeTextTurn = async (text) => {
     if (!text?.trim()) return
+    if (isProcessingTurnRef.current) return
+    isProcessingTurnRef.current = true
+
     setCaptionText(text)
     setIsAssistantSpeaking(false)
     isAssistantSpeakingRef.current = false
+    stopSpeaking()
 
     const sid = sessionIdRef.current
-    if (!sid) return
+    if (!sid) {
+      isProcessingTurnRef.current = false
+      return
+    }
 
     try {
       const res = await fetch('/v1/voice/turn', {
@@ -129,14 +140,19 @@ export default function StandalonePhoneView({ selectedLanguage = 'en', onSelectL
         const data = await res.json()
         setCaptionText(data.reply_text)
         await playReply(data.reply_text, data.reply_audio_base64)
+      } else {
+        isProcessingTurnRef.current = false
       }
     } catch (e) {
       console.warn('Voice turn error:', e)
+      isProcessingTurnRef.current = false
     }
   }
 
   // ─── Continuous Hands-Free VAD & Live Speech Recognition ───
   const startContinuousAudio = async () => {
+    hasNativeSpeechRef.current = false
+
     // 1. Browser Speech Recognition (Chrome / Edge / Android) for instant real-time transcription
     if (typeof window !== 'undefined') {
       const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition
@@ -163,6 +179,7 @@ export default function StandalonePhoneView({ selectedLanguage = 'en', onSelectL
             }
           }
           rec.onresult = (e) => {
+            hasNativeSpeechRef.current = true
             if (isAssistantSpeakingRef.current) {
               stopSpeaking()
               setIsAssistantSpeaking(false)
@@ -185,6 +202,7 @@ export default function StandalonePhoneView({ selectedLanguage = 'en', onSelectL
           }
           rec.start()
           speechRecognitionRef.current = rec
+          hasNativeSpeechRef.current = true
         } catch (e) {
           console.warn('SpeechRec start:', e)
         }
@@ -292,8 +310,8 @@ export default function StandalonePhoneView({ selectedLanguage = 'en', onSelectL
               tracker.isSpeaking = false
               tracker.silenceStartTime = 0
 
-              if (speechDuration >= 200) {
-                // Meaningful speech segment! Process it
+              if (!hasNativeSpeechRef.current && speechDuration >= 200) {
+                // Meaningful speech segment! Process it via backend ASR
                 sendSpokenSegment(mimeType)
               } else {
                 audioChunksRef.current = []

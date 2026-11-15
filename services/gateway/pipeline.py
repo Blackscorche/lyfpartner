@@ -128,7 +128,8 @@ class TurnPipeline:
             last_reply_text=session.last_reply_text,
             turn_count=session.turn_count
         )
-        agent_res = await self.llm_provider.respond(agent_req, self.tools)
+        llm = get_llm_provider()
+        agent_res = await llm.respond(agent_req, self.tools)
         reply_text = agent_res.reply_text
         intent = agent_res.intent
         next_state = agent_res.next_state

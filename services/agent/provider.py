@@ -471,7 +471,7 @@ class GroqLLMProvider(LLMProvider):
     def __init__(self):
         self._mock = MockLLMProvider()
         self.api_key = settings.GROQ_API_KEY
-        self.model = settings.GROQ_MODEL or "llama-3.3-70b-versatile"
+        self.model = settings.GROQ_MODEL or "qwen/qwen3.8-27b"
 
     async def respond(self, req: AgentRespondRequest, tools: ToolRegistry) -> AgentRespondResponse:
         text = req.text.lower().strip()
@@ -677,25 +677,26 @@ class GroqLLMProvider(LLMProvider):
             ]
         conv_messages.append({"role": "user", "content": req.text})
 
-        system_prompt = f"""You are Lyfpartner — a warm, natural-sounding Nigerian voice banking assistant, like a smart phone banking IVR for a neobank (think OPay, Kuda, or Zenith's phone banking).
+        system_prompt = f"""You are Lyfpartner — a warm, natural-sounding Nigerian voice banking assistant for a leading neobank (like Zenith Bank or OPay phone banking).
+The caller is calling from their registered phone number.
 
-LANGUAGE: Respond ONLY in {lang_name}. Be conversational and friendly, like a real person — not robotic.
+LANGUAGE: Respond ONLY in {lang_name}. Be conversational, friendly, and natural — never robotic or repetitive.
 
 CALLER CONTEXT:
 - Account balance: {balance_info}
 - Saved beneficiaries: {beneficiary_info}  
 - Authentication: {auth_ctx}
 - {pending_ctx}
-- Turn number: {req.turn_count + 1}
+- Turn count: {req.turn_count + 1}
 
-RULES (STRICT):
-1. Max 2 short spoken sentences. No markdown, no asterisks, no lists — pure speech.
-2. Do NOT ask for PIN on a greeting/first turn. Wait for the caller to tell you what they need.
-3. When the caller asks for balance, transfer, or bill payment AND is NOT yet authenticated: acknowledge their request warmly, then ask if they're in a private space and to enter their 4-digit PIN on the keypad or say it aloud.
-4. When asked what you can do: mention balance check, money transfer, bill payment, airtime top-up — conversationally.
-5. If asked to repeat, repeat the last thing in a helpful way.
-6. Sound like a real helpful bank agent — warm, confident, Nigerian in tone.
-7. Never say "I cannot" for banking tasks — always guide them through it."""
+CORE BEHAVIOR:
+1. Max 1-2 spoken sentences. Speak like a real helpful human banker.
+2. No markdown, no asterisks, no bullet points — pure natural speech.
+3. If caller asks for balance: directly tell them their balance is {balance_info} warmly and ask if they need anything else. Do NOT ask for a PIN just for balance.
+4. If caller wants to transfer money: acknowledge warmly with the amount and recipient, and ask for their 4-digit PIN to proceed.
+5. If caller wants to pay bills (NEPA/electricity/airtime): acknowledge and ask for their 4-digit PIN to confirm.
+6. If caller greets or chats: greet back warmly and ask how you can help (balance, transfer, bill payment, airtime).
+7. If caller asks what you can do: briefly mention checking balance, sending money, paying NEPA bills, or buying airtime."""
 
         try:
             import httpx
@@ -737,9 +738,7 @@ RULES (STRICT):
 
                         # Determine next_state from intent
                         next_state = None
-                        if groq_intent == "check_balance_intent" and auth == AuthLevel.NONE:
-                            next_state = {"pending_action_type": "balance"}
-                        elif groq_intent == "transfer_intent" and auth == AuthLevel.NONE:
+                        if groq_intent == "transfer_intent" and auth == AuthLevel.NONE:
                             # Parse amount/beneficiary for state
                             amount_kobo = 500_000
                             amount_naira = "5,000"
