@@ -203,49 +203,96 @@ export function speakText(text, lang = 'en', onStart, onEnd) {
   }
 }
 
+let currentPlayingAudio = null
+let currentAudioSourceNode = null
+let activeAudioFinishCallback = null
+
 export function stopSpeaking() {
+  if (currentPlayingAudio) {
+    try {
+      currentPlayingAudio.pause()
+      currentPlayingAudio.currentTime = 0
+      currentPlayingAudio.src = ''
+    } catch (e) {}
+    currentPlayingAudio = null
+  }
+  if (currentAudioSourceNode) {
+    try {
+      currentAudioSourceNode.stop()
+      currentAudioSourceNode.disconnect()
+    } catch (e) {}
+    currentAudioSourceNode = null
+  }
   if (typeof window !== 'undefined' && window.speechSynthesis) {
     try {
       window.speechSynthesis.cancel()
     } catch (e) {}
+  }
+  if (activeAudioFinishCallback) {
+    const cb = activeAudioFinishCallback
+    activeAudioFinishCallback = null
+    cb()
   }
 }
 
 /**
  * Decode and play a base64-encoded audio buffer.
  * Tries HTML5 Audio element first, with fallback to AudioContext decoding.
+ * Supports instant barge-in interruption via stopSpeaking().
  * Guaranteed to resolve and trigger onEnd callback so the UI never hangs.
  */
 export function playWavBase64(base64String, onStart, onEnd) {
+  // Stop any previously playing speech first
+  stopSpeaking()
+
   return new Promise((resolve) => {
     let completed = false
     const finish = () => {
       if (completed) return
       completed = true
+      activeAudioFinishCallback = null
+      currentPlayingAudio = null
+      currentAudioSourceNode = null
       if (onEnd) onEnd()
       resolve()
     }
 
+    activeAudioFinishCallback = finish
+
     // Safety timeout after 12s so turn state never freezes
-    setTimeout(finish, 12000)
+    const safetyTimer = setTimeout(finish, 12000)
 
     try {
       const audioUrl = "data:audio/wav;base64," + base64String
       const audio = new Audio(audioUrl)
+      currentPlayingAudio = audio
+
       audio.onplay = () => { if (onStart) onStart() }
-      audio.onended = finish
+      audio.onended = () => {
+        clearTimeout(safetyTimer)
+        finish()
+      }
       audio.onerror = () => {
-        playViaAudioContext(base64String, onStart, finish)
+        playViaAudioContext(base64String, onStart, () => {
+          clearTimeout(safetyTimer)
+          finish()
+        })
       }
 
       const p = audio.play()
       if (p !== undefined) {
         p.catch(() => {
-          playViaAudioContext(base64String, onStart, finish)
+          playViaAudioContext(base64String, onStart, () => {
+            clearTimeout(safetyTimer)
+            finish()
+          })
         })
       }
     } catch (e) {
-      playViaAudioContext(base64String, onStart, finish)
+      playViaAudioContext(base64String, onStart, () => {
+        clearTimeout(safetyTimer)
+        finish()
+      })
     }
   })
 }
@@ -267,15 +314,21 @@ function playViaAudioContext(base64String, onStart, onFinish) {
       arrayBuffer,
       (audioBuffer) => {
         const source = ctx.createBufferSource()
+        currentAudioSourceNode = source
         source.buffer = audioBuffer
         source.connect(ctx.destination)
         if (onStart) onStart()
-        source.onended = onFinish
+        source.onended = () => {
+          currentAudioSourceNode = null
+          if (onFinish) onFinish()
+        }
         source.start(0)
       },
-      () => onFinish()
+      () => {
+        if (onFinish) onFinish()
+      }
     )
   } catch (e) {
-    onFinish()
+    if (onFinish) onFinish()
   }
 }

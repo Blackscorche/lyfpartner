@@ -20,7 +20,7 @@ import {
 import { LANGUAGES } from '../data/languages'
 import { PhoneIcon } from './common/Icons'
 
-export default function StandalonePhoneView({ selectedLanguage = 'ha', onSelectLanguage }) {
+export default function StandalonePhoneView({ selectedLanguage = 'en', onSelectLanguage }) {
   const [deviceType, setDeviceType] = useState('iphone')
   const [phoneState, setPhoneState] = useState('dialer')
   const [callDuration, setCallDuration] = useState(0)
@@ -147,8 +147,27 @@ export default function StandalonePhoneView({ selectedLanguage = 'ha', onSelectL
           rec.interimResults = true
           rec.lang = captionLang === 'ha' ? 'ha-NG' : captionLang === 'yo' ? 'yo-NG' : captionLang === 'ig' ? 'ig-NG' : 'en-NG'
           
+          rec.onspeechstart = () => {
+            // Immediate barge-in cutoff
+            if (isAssistantSpeakingRef.current) {
+              stopSpeaking()
+              setIsAssistantSpeaking(false)
+              isAssistantSpeakingRef.current = false
+            }
+          }
+          rec.onsoundstart = () => {
+            if (isAssistantSpeakingRef.current) {
+              stopSpeaking()
+              setIsAssistantSpeaking(false)
+              isAssistantSpeakingRef.current = false
+            }
+          }
           rec.onresult = (e) => {
-            if (isAssistantSpeakingRef.current) return
+            if (isAssistantSpeakingRef.current) {
+              stopSpeaking()
+              setIsAssistantSpeaking(false)
+              isAssistantSpeakingRef.current = false
+            }
             for (let i = e.resultIndex; i < e.results.length; ++i) {
               const tr = e.results[i][0].transcript
               if (e.results[i].isFinal) {
@@ -227,8 +246,8 @@ export default function StandalonePhoneView({ selectedLanguage = 'ha', onSelectL
 
         // Check for caller barge-in if assistant is speaking
         if (isAssistantSpeakingRef.current) {
-          if (average > Math.max(22, noiseFloor * 1.8)) {
-            // User interrupted the assistant!
+          if (average > Math.max(7, noiseFloor * 1.2)) {
+            // User interrupted the assistant! Cut off audio instantly
             stopSpeaking()
             setIsAssistantSpeaking(false)
             isAssistantSpeakingRef.current = false
@@ -238,7 +257,7 @@ export default function StandalonePhoneView({ selectedLanguage = 'ha', onSelectL
             tracker.silenceStartTime = 0
           } else {
             audioChunksRef.current = [] // clear echo buffer
-            noiseFloor = Math.max(10, average * 0.45)
+            noiseFloor = Math.max(6, average * 0.4)
             animFrameRef.current = requestAnimationFrame(checkVolume)
             return
           }

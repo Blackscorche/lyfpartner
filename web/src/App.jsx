@@ -16,7 +16,7 @@ function getInitialRoute() {
 export default function App() {
   const [currentRoute, setCurrentRoute] = useState(getInitialRoute)
   const [isPresenterMode, setIsPresenterMode] = useState(false)
-  const [selectedLanguage, setSelectedLanguage] = useState('ha')
+  const [selectedLanguage, setSelectedLanguage] = useState('en')
   const [staffSession, setStaffSession] = useState(() => {
     try {
       const saved = localStorage.getItem('lyfpartner_staff_session')
