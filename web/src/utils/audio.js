@@ -7,7 +7,7 @@
 
 let audioCtx = null
 
-function getAudioContext() {
+export function getAudioContext() {
   if (!audioCtx) {
     const AudioContextClass = window.AudioContext || window.webkitAudioContext
     audioCtx = new AudioContextClass()
@@ -212,45 +212,70 @@ export function stopSpeaking() {
 }
 
 /**
- * Decode and play a base64-encoded WAV/audio buffer through AudioContext.
- * This BYPASSES the browser autoplay policy because AudioContext.resume()
- * is called, and decodeAudioData works with any user-gesture-unlocked context.
- * Returns a Promise that resolves when playback finishes (or rejects on error).
+ * Decode and play a base64-encoded audio buffer.
+ * Tries HTML5 Audio element first, with fallback to AudioContext decoding.
+ * Guaranteed to resolve and trigger onEnd callback so the UI never hangs.
  */
 export function playWavBase64(base64String, onStart, onEnd) {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
+    let completed = false
+    const finish = () => {
+      if (completed) return
+      completed = true
+      if (onEnd) onEnd()
+      resolve()
+    }
+
+    // Safety timeout after 12s so turn state never freezes
+    setTimeout(finish, 12000)
+
     try {
-      const ctx = getAudioContext()
-
-      // Convert base64 → ArrayBuffer
-      const binaryString = atob(base64String)
-      const bytes = new Uint8Array(binaryString.length)
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i)
+      const audioUrl = "data:audio/wav;base64," + base64String
+      const audio = new Audio(audioUrl)
+      audio.onplay = () => { if (onStart) onStart() }
+      audio.onended = finish
+      audio.onerror = () => {
+        playViaAudioContext(base64String, onStart, finish)
       }
-      const arrayBuffer = bytes.buffer
 
-      ctx.decodeAudioData(
-        arrayBuffer,
-        (audioBuffer) => {
-          const source = ctx.createBufferSource()
-          source.buffer = audioBuffer
-          source.connect(ctx.destination)
-          if (onStart) onStart()
-          source.onended = () => {
-            if (onEnd) onEnd()
-            resolve()
-          }
-          source.start(0)
-        },
-        (err) => {
-          console.warn('decodeAudioData error, falling back to <Audio>:', err)
-          reject(err)
-        }
-      )
+      const p = audio.play()
+      if (p !== undefined) {
+        p.catch(() => {
+          playViaAudioContext(base64String, onStart, finish)
+        })
+      }
     } catch (e) {
-      console.warn('playWavBase64 error:', e)
-      reject(e)
+      playViaAudioContext(base64String, onStart, finish)
     }
   })
+}
+
+function playViaAudioContext(base64String, onStart, onFinish) {
+  try {
+    const ctx = getAudioContext()
+    if (ctx.state === 'suspended') {
+      ctx.resume()
+    }
+    const binaryString = atob(base64String)
+    const bytes = new Uint8Array(binaryString.length)
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i)
+    }
+    const arrayBuffer = bytes.buffer
+
+    ctx.decodeAudioData(
+      arrayBuffer,
+      (audioBuffer) => {
+        const source = ctx.createBufferSource()
+        source.buffer = audioBuffer
+        source.connect(ctx.destination)
+        if (onStart) onStart()
+        source.onended = onFinish
+        source.start(0)
+      },
+      () => onFinish()
+    )
+  } catch (e) {
+    onFinish()
+  }
 }

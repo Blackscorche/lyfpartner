@@ -14,7 +14,8 @@ import {
   stopSpeaking,
   playCallConnectSound,
   playCallEndSound,
-  playWavBase64
+  playWavBase64,
+  getAudioContext
 } from '../utils/audio'
 import { LANGUAGES } from '../data/languages'
 import { PhoneIcon } from './common/Icons'
@@ -351,6 +352,17 @@ export default function StandalonePhoneView({ selectedLanguage = 'ha', onSelectL
 
   // ─── Call Controls ───
   const handleStartCall = async (shortCode = '333') => {
+    // Unconditionally unlock AudioContext & SpeechSynthesis on direct user interaction
+    try {
+      const ctx = getAudioContext()
+      if (ctx.state === 'suspended') {
+        ctx.resume()
+      }
+      if (typeof window !== 'undefined' && window.speechSynthesis) {
+        window.speechSynthesis.resume()
+      }
+    } catch (e) {}
+
     stopRingback()
     stopSpeaking()
     setPhoneState('ringing')
@@ -388,6 +400,7 @@ export default function StandalonePhoneView({ selectedLanguage = 'ha', onSelectL
       startContinuousAudio()
 
       // Fetch and play greeting TTS via AudioContext
+      let hasPlayed = false
       try {
         const ttsRes = await fetch('/v1/tts/speak', {
           method: 'POST',
@@ -401,13 +414,14 @@ export default function StandalonePhoneView({ selectedLanguage = 'ha', onSelectL
           for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i])
           const b64 = btoa(binary)
           await playWavBase64(b64, () => {
+            hasPlayed = true
             setIsAssistantSpeaking(true)
             isAssistantSpeakingRef.current = true
           }, () => {
             setIsAssistantSpeaking(false)
             isAssistantSpeakingRef.current = false
           })
-          return
+          if (hasPlayed) return
         }
       } catch (e) {
         console.warn('Greeting TTS error:', e)
