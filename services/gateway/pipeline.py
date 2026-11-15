@@ -140,7 +140,8 @@ class TurnPipeline:
         db.add(a_transcript)
 
         # 5. TTS Speech Generation
-        wav_bytes = await self.tts_provider.speak(reply_text, curr_lang, 16000)
+        tts = get_tts_provider()
+        wav_bytes = await tts.speak(reply_text, curr_lang, 16000)
         reply_audio_base64 = base64.b64encode(wav_bytes).decode("utf-8")
 
         # 6. Update Session State

@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     
     # Provider Settings
     ASR_PROVIDER: str = "mock"  # "mock", "natlas"
-    TTS_PROVIDER: str = "mock"  # "mock", "spitch"
+    TTS_PROVIDER: str = "natural"  # "natural" (neural Nigerian voices), "spitch", "mock"
     LLM_PROVIDER: str = "mock"  # "mock", "gemini", "natlas", "anthropic"
     VOICE_VERIFY_PROVIDER: str = "mock"  # "mock", "speaker_embedding"
     BANK_PROVIDER: str = "mock"
