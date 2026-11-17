@@ -42,7 +42,7 @@ export default function StandalonePhoneView({ selectedLanguage = 'en', onSelectL
   const audioContextRef = useRef(null)
   const animFrameRef = useRef(null)
   const speechRecognitionRef = useRef(null)
-  const hasNativeSpeechRef = useRef(false)
+  const lastDispatchedTextRef = useRef('')
   const isProcessingTurnRef = useRef(false)
   const speechTrackerRef = useRef({
     isSpeaking: false,
@@ -118,6 +118,7 @@ export default function StandalonePhoneView({ selectedLanguage = 'en', onSelectL
     if (!text?.trim()) return
     if (isProcessingTurnRef.current) return
     isProcessingTurnRef.current = true
+    lastDispatchedTextRef.current = text.trim()
 
     setCaptionText(text)
     setIsAssistantSpeaking(false)
@@ -151,9 +152,9 @@ export default function StandalonePhoneView({ selectedLanguage = 'en', onSelectL
 
   // ─── Continuous Hands-Free VAD & Live Speech Recognition ───
   const startContinuousAudio = async () => {
-    hasNativeSpeechRef.current = false
+    lastDispatchedTextRef.current = ''
 
-    // 1. Browser Speech Recognition (Chrome / Edge / Android) for instant real-time transcription
+    // 1. Browser Speech Recognition (Chrome / Edge / Android) for real-time captions & fast dispatch
     if (typeof window !== 'undefined') {
       const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition
       if (SpeechRec) {
@@ -161,10 +162,10 @@ export default function StandalonePhoneView({ selectedLanguage = 'en', onSelectL
           const rec = new SpeechRec()
           rec.continuous = true
           rec.interimResults = true
+          // Try localized language, fallback gracefully
           rec.lang = captionLang === 'ha' ? 'ha-NG' : captionLang === 'yo' ? 'yo-NG' : captionLang === 'ig' ? 'ig-NG' : 'en-NG'
-          
+
           rec.onspeechstart = () => {
-            // Immediate barge-in cutoff
             if (isAssistantSpeakingRef.current) {
               stopSpeaking()
               setIsAssistantSpeaking(false)
@@ -179,7 +180,6 @@ export default function StandalonePhoneView({ selectedLanguage = 'en', onSelectL
             }
           }
           rec.onresult = (e) => {
-            hasNativeSpeechRef.current = true
             if (isAssistantSpeakingRef.current) {
               stopSpeaking()
               setIsAssistantSpeaking(false)
@@ -199,19 +199,41 @@ export default function StandalonePhoneView({ selectedLanguage = 'en', onSelectL
           }
           rec.onerror = (err) => {
             console.warn('SpeechRecognition notice:', err.error || err)
+            // If language is not supported by browser, switch to en-US for captions while VAD handles backend ASR
+            if (err.error === 'language-not-supported' && rec.lang !== 'en-US') {
+              try {
+                rec.lang = 'en-US'
+                rec.start()
+              } catch (e) {}
+            }
           }
-          rec.start()
-          speechRecognitionRef.current = rec
-          hasNativeSpeechRef.current = true
+          rec.onend = () => {
+            // Keep SpeechRec alive throughout the phone call
+            if (phoneStateRef.current === 'incall') {
+              try { rec.start() } catch (e) {}
+            }
+          }
+          try {
+            rec.start()
+            speechRecognitionRef.current = rec
+          } catch (e) {
+            console.warn('SpeechRec start error:', e)
+          }
         } catch (e) {
-          console.warn('SpeechRec start:', e)
+          console.warn('SpeechRec init:', e)
         }
       }
     }
 
-    // 2. Web Audio Analyser & MediaRecorder VAD (works on all browsers)
+    // 2. Web Audio Analyser & MediaRecorder VAD with Echo Cancellation
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        }
+      })
       const AudioCtx = window.AudioContext || window.webkitAudioContext
       const audioCtx = new AudioCtx()
       audioContextRef.current = audioCtx
@@ -264,7 +286,9 @@ export default function StandalonePhoneView({ selectedLanguage = 'en', onSelectL
 
         // Check for caller barge-in if assistant is speaking
         if (isAssistantSpeakingRef.current) {
-          if (average > Math.max(7, noiseFloor * 1.2)) {
+          // Barge-in threshold: must be clear human speech above speaker playback
+          const bargeInThreshold = Math.max(35, noiseFloor * 2.0)
+          if (average > bargeInThreshold) {
             // User interrupted the assistant! Cut off audio instantly
             stopSpeaking()
             setIsAssistantSpeaking(false)
@@ -287,7 +311,7 @@ export default function StandalonePhoneView({ selectedLanguage = 'en', onSelectL
           return
         }
 
-        const voiceThreshold = Math.max(8, noiseFloor * 1.25)
+        const voiceThreshold = Math.max(10, noiseFloor * 1.3)
 
         if (average > voiceThreshold) {
           // Voice detected!
@@ -304,14 +328,18 @@ export default function StandalonePhoneView({ selectedLanguage = 'en', onSelectL
           if (tracker.isSpeaking) {
             if (tracker.silenceStartTime === 0) {
               tracker.silenceStartTime = now
-            } else if (now - tracker.silenceStartTime > 650) {
-              // 650ms of silence after speaking -> user finished talking!
+            } else if (now - tracker.silenceStartTime > 600) {
+              // 600ms of silence after speaking -> user finished talking!
               const speechDuration = tracker.silenceStartTime - tracker.speechStartTime
               tracker.isSpeaking = false
               tracker.silenceStartTime = 0
 
-              if (!hasNativeSpeechRef.current && speechDuration >= 200) {
-                // Meaningful speech segment! Process it via backend ASR
+              if (lastDispatchedTextRef.current) {
+                // SpeechRec already dispatched this turn
+                lastDispatchedTextRef.current = ''
+                audioChunksRef.current = []
+              } else if (speechDuration >= 200) {
+                // Send recorded audio to backend ASR (Groq Whisper)
                 sendSpokenSegment(mimeType)
               } else {
                 audioChunksRef.current = []
@@ -339,14 +367,25 @@ export default function StandalonePhoneView({ selectedLanguage = 'en', onSelectL
     const chunks = [...audioChunksRef.current]
     audioChunksRef.current = []
     if (chunks.length === 0) return
+    if (isProcessingTurnRef.current) return
+    isProcessingTurnRef.current = true
 
     const blob = new Blob(chunks, { type: mimeType || 'audio/webm' })
-    if (blob.size < 600) return
+    if (blob.size < 600) {
+      isProcessingTurnRef.current = false
+      return
+    }
+
+    const sid = sessionIdRef.current
+    if (!sid) {
+      isProcessingTurnRef.current = false
+      return
+    }
 
     try {
       const formData = new FormData()
       formData.append('audio', blob, 'turn.webm')
-      formData.append('session_id', sessionIdRef.current || '')
+      formData.append('session_id', sid)
 
       const res = await fetch('/v1/voice/turn_audio', {
         method: 'POST',
@@ -355,16 +394,17 @@ export default function StandalonePhoneView({ selectedLanguage = 'en', onSelectL
 
       if (res.ok) {
         const data = await res.json()
-        if (data.user_text) {
+        if (data.user_text && data.user_text !== '.') {
           setCaptionText(data.user_text)
         }
-        setTimeout(async () => {
-          setCaptionText(data.reply_text)
-          await playReply(data.reply_text, data.reply_audio_base64)
-        }, 150)
+        setCaptionText(data.reply_text)
+        await playReply(data.reply_text, data.reply_audio_base64)
+      } else {
+        isProcessingTurnRef.current = false
       }
     } catch (e) {
       console.warn('Turn error:', e)
+      isProcessingTurnRef.current = false
     }
   }
 
