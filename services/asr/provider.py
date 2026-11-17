@@ -7,6 +7,9 @@ import numpy as np
 import soundfile as sf
 from shared.config import settings
 from shared.schemas import Language, WordInfo, ASRResponse, LanguageDetectResponse
+from shared.logging_utils import get_logger
+
+logger = get_logger("asr_groq")
 
 class ASRProvider(ABC):
     @abstractmethod
@@ -182,6 +185,7 @@ class GroqWhisperASRProvider(ASRProvider):
                 if res.status_code == 200:
                     res_json = res.json()
                     text = res_json.get("text", "").strip()
+                    logger.info(f"Groq Whisper transcribed text: '{text}' (lang={whisper_lang})")
                     if text:
                         return ASRResponse(
                             text=text,
@@ -190,8 +194,10 @@ class GroqWhisperASRProvider(ASRProvider):
                             is_low_confidence=False,
                             words=[]
                         )
-        except Exception:
-            pass
+                else:
+                    logger.warning(f"Groq Whisper API returned {res.status_code}: {res.text}")
+        except Exception as e:
+            logger.exception(f"Groq Whisper transcription exception: {e}")
 
         return await self._mock.transcribe(audio_bytes, language)
 

@@ -44,6 +44,7 @@ export default function StandalonePhoneView({ selectedLanguage = 'en', onSelectL
   const speechRecognitionRef = useRef(null)
   const lastDispatchedTextRef = useRef('')
   const isProcessingTurnRef = useRef(false)
+  const lastTurnDispatchedAtRef = useRef(0)
   const speechTrackerRef = useRef({
     isSpeaking: false,
     silenceStartTime: 0,
@@ -89,12 +90,14 @@ export default function StandalonePhoneView({ selectedLanguage = 'en', onSelectL
     setIsAssistantSpeaking(true)
     isAssistantSpeakingRef.current = true
 
-    // Safety timeout to prevent getting stuck in assistant speaking state
+    // Safety timeout — scales with text length, min 10s, max 30s
+    const safetyMs = Math.min(30000, Math.max(10000, (replyText?.length || 50) * 80))
     const safetyTimer = setTimeout(() => {
+      console.warn('[playReply] safety timeout — force-releasing turn lock')
       setIsAssistantSpeaking(false)
       isAssistantSpeakingRef.current = false
       isProcessingTurnRef.current = false
-    }, 8000)
+    }, safetyMs)
 
     const onDone = () => {
       clearTimeout(safetyTimer)
@@ -109,15 +112,26 @@ export default function StandalonePhoneView({ selectedLanguage = 'en', onSelectL
         return
       } catch (e) {
         console.warn('AudioContext playback failed, trying Web Speech:', e)
+        // Fall through to speakText below — onDone still needs to fire
       }
     }
-    speakText(replyText, captionLang, null, onDone)
+    // If no audio or AudioContext failed, use Web Speech TTS
+    // Guard: if speakText throws or isn't available, always release lock
+    try {
+      speakText(replyText, captionLang, null, onDone)
+    } catch (e) {
+      console.warn('speakText failed, releasing lock:', e)
+      onDone()
+    }
   }
 
   const executeTextTurn = async (text) => {
     if (!text?.trim()) return
-    if (isProcessingTurnRef.current) return
+    // Time-based debounce: ignore if a turn was dispatched <400ms ago
+    const now = Date.now()
+    if (isProcessingTurnRef.current && (now - lastTurnDispatchedAtRef.current) < 400) return
     isProcessingTurnRef.current = true
+    lastTurnDispatchedAtRef.current = now
     lastDispatchedTextRef.current = text.trim()
 
     setCaptionText(text)
