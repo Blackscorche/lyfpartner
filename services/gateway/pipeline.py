@@ -1,6 +1,7 @@
 """Voice Turn Orchestration Pipeline with both HTTP microservice routing and local in-process fallback."""
 import base64
 import json
+import re
 import secrets
 from typing import Optional
 import httpx
@@ -96,8 +97,12 @@ class TurnPipeline:
         db.add(c_transcript)
 
         # 3. Check for Spoken PIN Elevation
+        # Only attempt PIN elevation when the utterance is primarily digits —
+        # not embedded in a natural-language command like "Send 5000 to Musa".
         digits = normalize_spoken_digits(transcribed_text)
-        if len(digits) == 4 and session.auth_level == AuthLevel.NONE.value:
+        _non_digit_words_in_text = [w for w in re.sub(r'\d', '', transcribed_text or '').split() if w.strip()]
+        _pin_candidate = len(digits) == 4 and len(_non_digit_words_in_text) <= 3
+        if _pin_candidate and session.auth_level == AuthLevel.NONE.value:
             cust = None
             if session.caller_id:
                 c_res = await db.execute(select(CustomerModel).where(CustomerModel.phone_number == session.caller_id))
