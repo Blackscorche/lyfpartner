@@ -212,10 +212,20 @@ export default function StandalonePhoneView({ selectedLanguage = 'en', onSelectL
               }
             }
           }
+          let speechRecDisabled = false
           rec.onerror = (err) => {
-            console.warn('SpeechRecognition notice:', err.error || err)
+            const errType = err.error || err
+            console.warn('SpeechRecognition notice:', errType)
+            // Brave and privacy browsers block Google Speech API with a 'network' error.
+            // Disable immediately to prevent tight 70x/sec error loop that freezes mic audio.
+            if (errType === 'network' || errType === 'not-allowed' || errType === 'service-not-allowed') {
+              speechRecDisabled = true
+              try { rec.abort() } catch (e) {}
+              speechRecognitionRef.current = null
+              return
+            }
             // If language is not supported by browser, switch to en-US for captions while VAD handles backend ASR
-            if (err.error === 'language-not-supported' && rec.lang !== 'en-US') {
+            if (errType === 'language-not-supported' && rec.lang !== 'en-US') {
               try {
                 rec.lang = 'en-US'
                 rec.start()
@@ -223,6 +233,7 @@ export default function StandalonePhoneView({ selectedLanguage = 'en', onSelectL
             }
           }
           rec.onend = () => {
+            if (speechRecDisabled) return
             // Keep SpeechRec alive throughout the phone call
             if (phoneStateRef.current === 'incall') {
               try { rec.start() } catch (e) {}
@@ -258,7 +269,7 @@ export default function StandalonePhoneView({ selectedLanguage = 'en', onSelectL
       analyser.fftSize = 512
       source.connect(analyser)
 
-      // MediaRecorder to capture audio segments
+      // MediaRecorder to capture audio segments on speech activity
       const mimeType = [
         'audio/webm;codecs=opus',
         'audio/webm',
@@ -271,14 +282,20 @@ export default function StandalonePhoneView({ selectedLanguage = 'en', onSelectL
 
       recorder.ondataavailable = (e) => {
         if (e.data && e.data.size > 0) {
-          if (!webmHeaderRef.current) {
-            webmHeaderRef.current = e.data
-          }
           audioChunksRef.current.push(e.data)
         }
       }
 
-      recorder.start(100) // 100ms time slices
+      recorder.onstop = () => {
+        const chunks = [...audioChunksRef.current]
+        audioChunksRef.current = []
+        if (chunks.length === 0) return
+        const blob = new Blob(chunks, { type: mimeType || 'audio/webm' })
+        if (blob.size >= 800) {
+          dispatchAudioBlob(blob)
+        }
+      }
+
       setIsListeningMic(true)
 
       const bufferLength = analyser.frequencyBinCount
@@ -304,17 +321,20 @@ export default function StandalonePhoneView({ selectedLanguage = 'en', onSelectL
 
         // Check for caller barge-in if assistant is speaking
         if (isAssistantSpeakingRef.current) {
-          // Barge-in threshold: must be clear human speech above speaker playback
           const bargeInThreshold = Math.max(35, noiseFloor * 2.0)
           if (average > bargeInThreshold) {
             // User interrupted the assistant! Cut off audio instantly
             stopSpeaking()
             setIsAssistantSpeaking(false)
             isAssistantSpeakingRef.current = false
-            audioChunksRef.current = []
             tracker.isSpeaking = true
             tracker.speechStartTime = now
             tracker.silenceStartTime = 0
+            if (recorder.state === 'recording') {
+              try { recorder.stop() } catch (e) {}
+            }
+            audioChunksRef.current = []
+            try { recorder.start(100) } catch (e) {}
           } else {
             audioChunksRef.current = [] // clear echo buffer
             noiseFloor = Math.max(6, average * 0.4)
@@ -337,6 +357,10 @@ export default function StandalonePhoneView({ selectedLanguage = 'en', onSelectL
             tracker.isSpeaking = true
             tracker.speechStartTime = now
             tracker.silenceStartTime = 0
+            if (recorder.state === 'inactive') {
+              audioChunksRef.current = []
+              try { recorder.start(100) } catch (e) {}
+            }
           } else {
             tracker.silenceStartTime = 0
           }
@@ -346,8 +370,8 @@ export default function StandalonePhoneView({ selectedLanguage = 'en', onSelectL
           if (tracker.isSpeaking) {
             if (tracker.silenceStartTime === 0) {
               tracker.silenceStartTime = now
-            } else if (now - tracker.silenceStartTime > 600) {
-              // 600ms of silence after speaking -> user finished talking!
+            } else if (now - tracker.silenceStartTime > 650) {
+              // 650ms of silence after speaking -> speech segment complete!
               const speechDuration = tracker.silenceStartTime - tracker.speechStartTime
               tracker.isSpeaking = false
               tracker.silenceStartTime = 0
@@ -356,17 +380,18 @@ export default function StandalonePhoneView({ selectedLanguage = 'en', onSelectL
                 // SpeechRec already dispatched this turn
                 lastDispatchedTextRef.current = ''
                 audioChunksRef.current = []
-              } else if (speechDuration >= 200) {
-                // Send recorded audio to backend ASR (Groq Whisper)
-                sendSpokenSegment(mimeType)
+                if (recorder.state === 'recording') {
+                  try { recorder.stop() } catch (e) {}
+                }
+              } else if (speechDuration >= 250 && recorder.state === 'recording') {
+                // Stopping recorder triggers onstop -> dispatches pristine WebM
+                try { recorder.stop() } catch (e) {}
               } else {
                 audioChunksRef.current = []
+                if (recorder.state === 'recording') {
+                  try { recorder.stop() } catch (e) {}
+                }
               }
-            }
-          } else {
-            // Keep buffer small while waiting
-            if (audioChunksRef.current.length > 25) {
-              audioChunksRef.current = audioChunksRef.current.slice(-15)
             }
           }
         }
@@ -381,23 +406,9 @@ export default function StandalonePhoneView({ selectedLanguage = 'en', onSelectL
     }
   }
 
-  const sendSpokenSegment = async (mimeType) => {
-    let chunks = [...audioChunksRef.current]
-    audioChunksRef.current = []
-    if (chunks.length === 0) return
+  const dispatchAudioBlob = async (blob) => {
     if (isProcessingTurnRef.current) return
     isProcessingTurnRef.current = true
-
-    // Ensure the container header chunk is prepended so ffmpeg/Whisper can parse it
-    if (webmHeaderRef.current && chunks[0] !== webmHeaderRef.current) {
-      chunks = [webmHeaderRef.current, ...chunks]
-    }
-
-    const blob = new Blob(chunks, { type: mimeType || 'audio/webm' })
-    if (blob.size < 600) {
-      isProcessingTurnRef.current = false
-      return
-    }
 
     const sid = sessionIdRef.current
     if (!sid) {
