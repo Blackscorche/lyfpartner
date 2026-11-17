@@ -133,10 +133,6 @@ def _rule_based_intent(text: str, lang: Language, pending: Dict) -> Dict[str, An
     if ben_match:
         slots["beneficiary"] = ben_match.group(1).strip()
 
-    # Greeting — short phrases only
-    if any(w in t for w in GREETING_KEYWORDS) and len(t.split()) <= 6:
-        return {"intent": "greeting", "slots": slots, "reply_hint": ""}
-
     # Bill check before transfer (some bill keywords overlap with "pay")
     is_bill = (
         any(w in t for w in BILL_KEYWORDS_EN)
@@ -170,6 +166,10 @@ def _rule_based_intent(text: str, lang: Language, pending: Dict) -> Dict[str, An
 
     if any(w in t for w in REPEAT_KEYWORDS):
         return {"intent": "repeat_last", "slots": slots, "reply_hint": ""}
+
+    # Pure greeting — when no specific banking action was requested
+    if any(w in t for w in GREETING_KEYWORDS) and len(t.split()) <= 6:
+        return {"intent": "greeting", "slots": slots, "reply_hint": ""}
 
     return {"intent": "unknown", "slots": slots, "reply_hint": ""}
 

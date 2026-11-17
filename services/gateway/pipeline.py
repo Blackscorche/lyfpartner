@@ -65,7 +65,8 @@ class TurnPipeline:
         curr_lang = Language(session.language) if session.language else Language.HAUSA
 
         if audio_bytes and not text_input:
-            asr_data = await self.asr_provider.transcribe(audio_bytes, curr_lang)
+            asr = get_asr_provider()
+            asr_data = await asr.transcribe(audio_bytes, curr_lang)
             transcribed_text = asr_data.text
             is_low_conf = asr_data.is_low_confidence
 

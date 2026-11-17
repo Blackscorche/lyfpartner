@@ -45,6 +45,7 @@ export default function StandalonePhoneView({ selectedLanguage = 'en', onSelectL
   const lastDispatchedTextRef = useRef('')
   const isProcessingTurnRef = useRef(false)
   const lastTurnDispatchedAtRef = useRef(0)
+  const webmHeaderRef = useRef(null)
   const speechTrackerRef = useRef({
     isSpeaking: false,
     silenceStartTime: 0,
@@ -270,6 +271,9 @@ export default function StandalonePhoneView({ selectedLanguage = 'en', onSelectL
 
       recorder.ondataavailable = (e) => {
         if (e.data && e.data.size > 0) {
+          if (!webmHeaderRef.current) {
+            webmHeaderRef.current = e.data
+          }
           audioChunksRef.current.push(e.data)
         }
       }
@@ -378,11 +382,16 @@ export default function StandalonePhoneView({ selectedLanguage = 'en', onSelectL
   }
 
   const sendSpokenSegment = async (mimeType) => {
-    const chunks = [...audioChunksRef.current]
+    let chunks = [...audioChunksRef.current]
     audioChunksRef.current = []
     if (chunks.length === 0) return
     if (isProcessingTurnRef.current) return
     isProcessingTurnRef.current = true
+
+    // Ensure the container header chunk is prepended so ffmpeg/Whisper can parse it
+    if (webmHeaderRef.current && chunks[0] !== webmHeaderRef.current) {
+      chunks = [webmHeaderRef.current, ...chunks]
+    }
 
     const blob = new Blob(chunks, { type: mimeType || 'audio/webm' })
     if (blob.size < 600) {
@@ -438,6 +447,7 @@ export default function StandalonePhoneView({ selectedLanguage = 'en', onSelectL
       try { audioContextRef.current.close() } catch (e) {}
       audioContextRef.current = null
     }
+    webmHeaderRef.current = null
     setIsListeningMic(false)
   }
 

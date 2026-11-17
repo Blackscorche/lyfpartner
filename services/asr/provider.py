@@ -48,13 +48,9 @@ class MockASRProvider(ASRProvider):
             prompt_part = audio_str.split("PROMPT:")[1].split("\n")[0].strip()
             text = prompt_part
         else:
-            defaults = {
-                Language.HAUSA: "Ina son duba kudi na",
-                Language.IGBO: "Echere m ego ole m nwere",
-                Language.YORUBA: "Mo fe san owo ina",
-                Language.NIGERIAN_ENGLISH: "I want to check my account balance"
-            }
-            text = defaults.get(language, "Hello")
+            # Fallback for mock: NEVER invent balance checks!
+            text = "Hello"
+            confidence = 0.50
 
         words = []
         token_list = text.split()
@@ -112,7 +108,8 @@ class GroqWhisperASRProvider(ASRProvider):
         if "LOW_CONFIDENCE" in audio_str or "PROMPT:" in audio_str:
             return await self._mock.transcribe(audio_bytes, language)
 
-        if not self.api_key:
+        api_key = settings.GROQ_API_KEY or self.api_key
+        if not api_key:
             return await self._mock.transcribe(audio_bytes, language)
 
         # Determine proper extension and content type for Groq Whisper
@@ -178,7 +175,7 @@ class GroqWhisperASRProvider(ASRProvider):
                 }
                 res = await client.post(
                     "https://api.groq.com/openai/v1/audio/transcriptions",
-                    headers={"Authorization": f"Bearer {self.api_key}"},
+                    headers={"Authorization": f"Bearer {api_key}"},
                     files=files,
                     data=data
                 )
