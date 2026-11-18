@@ -69,7 +69,14 @@ HELP_KEYWORDS = [
     "taimako", "iranlowo", "enyemaka", "kini e le se", "me za ku iya yi", "kedu ihe"
 ]
 
-AIRTIME_KEYWORDS = ["airtime", "recharge", "katin waya", "kaadi ipe"]
+AIRTIME_KEYWORDS = [
+    "airtime", "recharge", "topup", "top up", "credit", "katin waya", "kaadi ipe",
+    "buy airtime", "send airtime", "sayen katin waya", "ra kaadi"
+]
+DATA_KEYWORDS = [
+    "data", "internet", "bundle", "gig", "browse", "browsing", "megabyte", "gigabyte",
+    "sayen data", "ra data", "zuta data", "data bundle", "buy data"
+]
 
 GREETING_KEYWORDS = [
     "hello", "hi", "good morning", "good afternoon", "good evening",
@@ -192,6 +199,64 @@ def _extract_meter_number(text: str) -> Optional[str]:
         return digits_only
     return None
 
+STANDARD_DATA_PLANS = {
+    "1gb": {"name": "1GB", "amount_naira": 500, "amount_kobo": 50_000, "validity": "30 days"},
+    "2.5gb": {"name": "2.5GB", "amount_naira": 1000, "amount_kobo": 100_000, "validity": "30 days"},
+    "2gb": {"name": "2.5GB", "amount_naira": 1000, "amount_kobo": 100_000, "validity": "30 days"},
+    "5gb": {"name": "5GB", "amount_naira": 1500, "amount_kobo": 150_000, "validity": "30 days"},
+    "10gb": {"name": "10GB", "amount_naira": 3000, "amount_kobo": 300_000, "validity": "30 days"},
+}
+
+def _detect_network(phone: str) -> str:
+    """Detect Nigerian mobile network from phone prefix."""
+    p = phone.strip()
+    if p.startswith("+234"):
+        p = "0" + p[4:]
+    elif p.startswith("234"):
+        p = "0" + p[3:]
+    prefix = p[:4]
+
+    mtn_prefixes = {"0803", "0806", "0703", "0706", "0813", "0816", "0810", "0814", "0903", "0906", "0913", "0916"}
+    airtel_prefixes = {"0802", "0808", "0708", "0812", "0701", "0902", "0901", "0904", "0907", "0912"}
+    glo_prefixes = {"0805", "0807", "0705", "0815", "0811", "0905", "0915"}
+    etisalat_prefixes = {"0809", "0817", "0818", "0909", "0908"}
+
+    if prefix in mtn_prefixes:
+        return "MTN"
+    if prefix in airtel_prefixes:
+        return "Airtel"
+    if prefix in glo_prefixes:
+        return "Glo"
+    if prefix in etisalat_prefixes:
+        return "9mobile"
+    return "MTN"
+
+def _extract_phone_number(text: str) -> Optional[str]:
+    """Find a Nigerian phone number in text (e.g. 08012345678 or +2348012345678)."""
+    m = re.search(r'(\+234\d{10}|0[789][01]\d{8})\b', text)
+    if m:
+        return m.group(1)
+    return None
+
+def _extract_network_from_text(text: str) -> Optional[str]:
+    t = text.lower()
+    if "mtn" in t:
+        return "MTN"
+    if "airtel" in t:
+        return "Airtel"
+    if "glo" in t or "globacom" in t:
+        return "Glo"
+    if "9mobile" in t or "etisalat" in t:
+        return "9mobile"
+    return None
+
+def _extract_data_plan(text: str) -> Optional[Dict[str, Any]]:
+    t = text.lower().replace(" ", "")
+    for key, plan in STANDARD_DATA_PLANS.items():
+        if key in t:
+            return plan
+    return None
+
 
 def _extract_beneficiary_name(text: str, beneficiaries: List[Dict]) -> Optional[Dict]:
     """Return first beneficiary whose name/nickname appears in text."""
@@ -221,12 +286,30 @@ def _rule_based_intent(text: str, lang: Language, pending: Dict) -> Dict[str, An
         "bill_type": None,
         "account_number": None,
         "bank_name": None,
-        "meter_number": None
+        "meter_number": None,
+        "phone_number": None,
+        "network": None,
+        "data_plan": None
     }
 
     amount_naira = _parse_amount(t)
     if amount_naira:
         slots["amount"] = amount_naira
+
+    phone = _extract_phone_number(text)
+    if phone:
+        slots["phone_number"] = phone
+        slots["network"] = _detect_network(phone)
+
+    net = _extract_network_from_text(text)
+    if net:
+        slots["network"] = net
+
+    d_plan = _extract_data_plan(text)
+    if d_plan:
+        slots["data_plan"] = d_plan["name"]
+        if not slots["amount"]:
+            slots["amount"] = d_plan["amount_naira"]
 
     # Common English words that look like names after "to" but are NOT beneficiaries
     _NOT_NAMES = {
@@ -234,6 +317,7 @@ def _rule_based_intent(text: str, lang: Language, pending: Dict) -> Dict[str, An
         "check", "buy", "get", "give", "someone", "anyone", "this", "that", "him",
         "her", "them", "you", "me", "it", "us", "who", "whom", "what", "how", "when",
         "where", "why", "an", "another", "one", "two", "three", "four", "five",
+        "airtime", "data", "credit", "recharge", "phone"
     }
     ben_match = re.search(r'(?:to|ti|for|ga|si|nye)\s+([A-Za-z][A-Za-z\s]{1,20}?)(?:\s+(?:in|at|on|via|account|bank|\d)|$)', text, re.IGNORECASE)
     if ben_match:
@@ -278,11 +362,14 @@ def _rule_based_intent(text: str, lang: Language, pending: Dict) -> Dict[str, An
         slots["bill_type"] = bill_type
         return {"intent": "pay_bill", "slots": slots, "reply_hint": ""}
 
-    if any(w in t for w in BALANCE_KEYWORDS):
-        return {"intent": "check_balance", "slots": slots, "reply_hint": ""}
+    if any(w in t for w in DATA_KEYWORDS):
+        return {"intent": "buy_data", "slots": slots, "reply_hint": ""}
 
     if any(w in t for w in AIRTIME_KEYWORDS):
         return {"intent": "airtime", "slots": slots, "reply_hint": ""}
+
+    if any(w in t for w in BALANCE_KEYWORDS):
+        return {"intent": "check_balance", "slots": slots, "reply_hint": ""}
 
     if any(w in t for w in HELP_KEYWORDS):
         return {"intent": "help", "slots": slots, "reply_hint": ""}
@@ -372,6 +459,60 @@ def _bill_success(lang: Language, amount_fmt: str, meter_no: str, token: str, bi
         Language.IGBO: f"Ịkwụ ụgwọ ọkụ eletrik nke Naira {amount_fmt} maka mita {meter_no} gara nke ọma! Nọmba nchaji gị bụ {token}. Anyị eziterela gị ozi SMS.",
         Language.YORUBA: f"Isanwo owo ina NEPA ti Naira {amount_fmt} fun mita {meter_no} ti jasi aṣeyọri! Nọmba ina yin ni {token}. A ti fi SMS ranṣẹ si yin.",
         Language.NIGERIAN_ENGLISH: f"Your payment of {amount_fmt} Naira to {biller_name} for meter {meter_no} was successful! Your recharge token is {token}. An SMS receipt has been sent to your phone."
+    })
+
+
+def _ask_airtime_amount(lang: Language, phone: str, network: str) -> str:
+    return _r(lang, {
+        Language.HAUSA: f"Nawa kuke son sayen katin waya na {network} don lambar {phone}?",
+        Language.IGBO: f"Ego ole ka ị chọrọ ịzụta kredit {network} maka akara {phone}?",
+        Language.YORUBA: f"Elo ni ẹ fẹ ra kaadi {network} fun nọmba {phone}?",
+        Language.NIGERIAN_ENGLISH: f"How much {network} airtime would you like to buy for {phone}?"
+    })
+
+
+def _confirm_airtime_prompt(lang: Language, amount_fmt: str, phone: str, network: str) -> str:
+    return _r(lang, {
+        Language.HAUSA: f"An tabbatar da lambar sirri! Kuna son sayen katin waya na {network} Naira {amount_fmt} don {phone}. In tura?",
+        Language.IGBO: f"A kwadoro nọmba nzuzo gị! Ị chọrọ ịzụta kredit {network} nke Naira {amount_fmt} maka {phone}. M ga-eziga ya?",
+        Language.YORUBA: f"A ti fọwọsi nọmba asiri yin! Ṣe ẹ fẹ ra kaadi {network} ti Naira {amount_fmt} fun {phone}? Ṣe kin tẹsiwaju?",
+        Language.NIGERIAN_ENGLISH: f"PIN verified! Confirm {network} airtime recharge of {amount_fmt} Naira for {phone}. Should I go ahead?"
+    })
+
+
+def _airtime_success(lang: Language, amount_fmt: str, phone: str, network: str) -> str:
+    return _r(lang, {
+        Language.HAUSA: f"An tura katin waya na {network} Naira {amount_fmt} zuwa {phone} cikin nasara. An aiko muku da sakon SMS.",
+        Language.IGBO: f"E zigara kredit {network} nke Naira {amount_fmt} na akara {phone} nke ọma. Anyị eziterela gị ozi SMS.",
+        Language.YORUBA: f"A ti fi kaadi {network} ti Naira {amount_fmt} ranṣẹ si {phone} lori aṣeyọri. A ti fi SMS ranṣẹ si yin.",
+        Language.NIGERIAN_ENGLISH: f"Your {network} airtime recharge of {amount_fmt} Naira to {phone} was successful! An SMS receipt has been sent."
+    })
+
+
+def _ask_data_plan(lang: Language, phone: str, network: str) -> str:
+    return _r(lang, {
+        Language.HAUSA: f"Wane tsarin data na {network} kuke so don {phone}? Muna da 1GB kan Naira 500, 2.5GB kan Naira 1,000, ko 5GB kan Naira 1,500.",
+        Language.IGBO: f"Kedu atụmatụ data {network} ị chọrọ maka {phone}? Anyị nwere 1GB maka Naira 500, 2.5GB maka Naira 1,000, ma ọ bụ 5GB maka Naira 1,500.",
+        Language.YORUBA: f"Eto data {network} wo ni ẹ fẹ fun {phone}? A ni 1GB fun Naira 500, 2.5GB fun Naira 1,000, tabi 5GB fun Naira 1,500.",
+        Language.NIGERIAN_ENGLISH: f"Which {network} data plan would you like for {phone}? We have 1GB for 500 Naira, 2.5GB for 1,000 Naira, or 5GB for 1,500 Naira."
+    })
+
+
+def _confirm_data_prompt(lang: Language, plan_name: str, amount_fmt: str, phone: str, network: str) -> str:
+    return _r(lang, {
+        Language.HAUSA: f"An tabbatar da lambar sirri! Kuna son sayen data {network} {plan_name} kan Naira {amount_fmt} don {phone}. In kunna?",
+        Language.IGBO: f"A kwadoro nọmba nzuzo gị! Ị chọrọ ịzụta data {network} {plan_name} maka Naira {amount_fmt} maka {phone}. M ga-aga n'ihu?",
+        Language.YORUBA: f"A ti fọwọsi nọmba asiri yin! Ṣe ẹ fẹ ra data {network} {plan_name} fun Naira {amount_fmt} fun {phone}? Ṣe kin tẹsiwaju?",
+        Language.NIGERIAN_ENGLISH: f"PIN verified! Confirm {network} {plan_name} data bundle for {phone} at {amount_fmt} Naira. Should I go ahead?"
+    })
+
+
+def _data_success(lang: Language, plan_name: str, amount_fmt: str, phone: str, network: str) -> str:
+    return _r(lang, {
+        Language.HAUSA: f"An kunna tsarin data {network} {plan_name} don {phone} cikin nasara! An aiko muku da sakon SMS.",
+        Language.IGBO: f"E meela ka data {network} {plan_name} rụọ ọrụ maka {phone} nke ọma! Anyị eziterela gị ozi SMS.",
+        Language.YORUBA: f"A ti mu data {network} {plan_name} ṣiṣẹ fun {phone} laseyori! A ti fi SMS ranṣẹ si yin.",
+        Language.NIGERIAN_ENGLISH: f"Your {network} {plan_name} data bundle for {phone} has been activated successfully! An SMS confirmation has been sent."
     })
 
 
@@ -546,6 +687,14 @@ async def _run_state_machine(
         and pending.get("meter_verified")
         and not pending.get("amount_kobo")
     )
+    _collecting_airtime_amount = (
+        pending.get("pending_action_type") == "airtime"
+        and not pending.get("amount_kobo")
+    )
+    _collecting_data_plan = (
+        pending.get("pending_action_type") == "data"
+        and not pending.get("plan_name")
+    )
 
     is_pin_input = (
         (bool(digits_match) or text.strip() in ["1234", "1 2 3 4"])
@@ -555,6 +704,8 @@ async def _run_state_machine(
         and not _collecting_transfer_acct
         and not _collecting_meter
         and not _collecting_bill_amount
+        and not _collecting_airtime_amount
+        and not _collecting_data_plan
     )
 
     if is_pin_input:
@@ -636,6 +787,46 @@ async def _run_state_machine(
                     "biller_id": biller_id,
                     "biller_name": biller_name,
                     "meter_no": meter_no,
+                    "amount_kobo": amount_kobo,
+                    "amount_naira": amount_naira
+                }
+            )
+
+        elif pending_type == "airtime":
+            phone = pending.get("phone", caller_id)
+            network = pending.get("network", _detect_network(phone))
+            amount_kobo = pending.get("amount_kobo", 100_000)
+            amount_naira = pending.get("amount_naira", "1,000")
+
+            return AgentRespondResponse(
+                reply_text=_confirm_airtime_prompt(lang, amount_naira, phone, network),
+                intent="quote_airtime",
+                needs_confirmation=True,
+                next_state={
+                    "action": "confirm_airtime",
+                    "phone": phone,
+                    "network": network,
+                    "amount_kobo": amount_kobo,
+                    "amount_naira": amount_naira
+                }
+            )
+
+        elif pending_type == "data":
+            phone = pending.get("phone", caller_id)
+            network = pending.get("network", _detect_network(phone))
+            plan_name = pending.get("plan_name", "2.5GB")
+            amount_kobo = pending.get("amount_kobo", 100_000)
+            amount_naira = pending.get("amount_naira", "1,000")
+
+            return AgentRespondResponse(
+                reply_text=_confirm_data_prompt(lang, plan_name, amount_naira, phone, network),
+                intent="quote_data",
+                needs_confirmation=True,
+                next_state={
+                    "action": "confirm_data",
+                    "phone": phone,
+                    "network": network,
+                    "plan_name": plan_name,
                     "amount_kobo": amount_kobo,
                     "amount_naira": amount_naira
                 }
@@ -757,6 +948,74 @@ async def _run_state_machine(
 
         reask = _confirm_bill_prompt(lang, amount_naira, meter_no, biller_name)
         return AgentRespondResponse(reply_text=reask, intent="awaiting_bill_confirmation", next_state=pending)
+
+    if pending.get("action") == "confirm_airtime":
+        phone = pending.get("phone", caller_id)
+        network = pending.get("network", "MTN")
+        amount_kobo = pending.get("amount_kobo", 100_000)
+        amount_naira = pending.get("amount_naira", "1,000")
+
+        if any(w in text for w in CONFIRMATION_KEYWORDS):
+            idem_key = f"idem_airtime_{secrets.token_hex(6)}"
+            airtime_res = await tools.buy_airtime(
+                account_id=account_id, phone_number=phone, network=network,
+                amount_kobo=amount_kobo, idempotency_key=idem_key, session_id=req.session_id
+            )
+            tool_records.append(ToolCallRecord(tool="buy_airtime", arguments={"phone": phone, "network": network, "amount_kobo": amount_kobo}, result=airtime_res))
+            sms_msg = f"Lyfpartner TopUp: NGN {amount_naira}.00 {network} airtime loaded for {phone}. Ref: {airtime_res.get('reference')}."
+            sms_res = await tools.send_sms_receipt(caller_id, sms_msg)
+            tool_records.append(ToolCallRecord(tool="send_sms_receipt", arguments={"to": caller_id}, result=sms_res))
+            return AgentRespondResponse(
+                reply_text=_airtime_success(lang, amount_naira, phone, network),
+                intent="airtime_completed",
+                tool_calls=tool_records,
+                next_state=None
+            )
+
+        if any(w in text for w in CANCEL_KEYWORDS):
+            return AgentRespondResponse(
+                reply_text=_cancel_reply(lang),
+                intent="airtime_cancelled",
+                next_state=None
+            )
+
+        reask = _confirm_airtime_prompt(lang, amount_naira, phone, network)
+        return AgentRespondResponse(reply_text=reask, intent="awaiting_airtime_confirmation", next_state=pending)
+
+    if pending.get("action") == "confirm_data":
+        phone = pending.get("phone", caller_id)
+        network = pending.get("network", "MTN")
+        plan_name = pending.get("plan_name", "2.5GB")
+        amount_kobo = pending.get("amount_kobo", 100_000)
+        amount_naira = pending.get("amount_naira", "1,000")
+
+        if any(w in text for w in CONFIRMATION_KEYWORDS):
+            idem_key = f"idem_data_{secrets.token_hex(6)}"
+            data_res = await tools.buy_data(
+                account_id=account_id, phone_number=phone, network=network,
+                plan_name=plan_name, amount_kobo=amount_kobo,
+                idempotency_key=idem_key, session_id=req.session_id
+            )
+            tool_records.append(ToolCallRecord(tool="buy_data", arguments={"phone": phone, "network": network, "plan": plan_name, "amount_kobo": amount_kobo}, result=data_res))
+            sms_msg = f"Lyfpartner Data: {plan_name} {network} data bundle activated for {phone}. Ref: {data_res.get('reference')}."
+            sms_res = await tools.send_sms_receipt(caller_id, sms_msg)
+            tool_records.append(ToolCallRecord(tool="send_sms_receipt", arguments={"to": caller_id}, result=sms_res))
+            return AgentRespondResponse(
+                reply_text=_data_success(lang, plan_name, amount_naira, phone, network),
+                intent="data_completed",
+                tool_calls=tool_records,
+                next_state=None
+            )
+
+        if any(w in text for w in CANCEL_KEYWORDS):
+            return AgentRespondResponse(
+                reply_text=_cancel_reply(lang),
+                intent="data_cancelled",
+                next_state=None
+            )
+
+        reask = _confirm_data_prompt(lang, plan_name, amount_naira, phone, network)
+        return AgentRespondResponse(reply_text=reask, intent="awaiting_data_confirmation", next_state=pending)
 
     # ── STEP 4: Slot-filling for in-progress operations ─────────────────────
     if pending.get("pending_action_type") == "transfer":
@@ -898,6 +1157,89 @@ async def _run_state_machine(
             Language.IGBO: f"Ị chọrọ ịkwụ Naira {amt_fmt} maka mita {biller} {meter}.",
             Language.YORUBA: f"Ẹ fẹ san Naira {amt_fmt} fun mita {biller} {meter}.",
             Language.NIGERIAN_ENGLISH: f"You want to pay {amt_fmt} Naira for {biller} meter {meter}."
+        })
+        return AgentRespondResponse(
+            reply_text=_ask_pin_privacy(lang, summary),
+            intent="pin_privacy_prompt",
+            next_state=updated
+        )
+
+    if pending.get("pending_action_type") == "airtime":
+        updated = dict(pending)
+        phone = _extract_phone_number(req.text) or slots.get("phone_number")
+        if phone:
+            updated["phone"] = phone
+            updated["network"] = _detect_network(phone)
+        net = _extract_network_from_text(req.text) or slots.get("network")
+        if net:
+            updated["network"] = net
+
+        amt = _parse_amount(req.text) or slots.get("amount")
+        if amt:
+            updated["amount_kobo"] = amt * 100
+            updated["amount_naira"] = f"{amt:,}"
+
+        phone = updated.get("phone", caller_id)
+        network = updated.get("network", _detect_network(phone))
+
+        if not updated.get("amount_kobo"):
+            return AgentRespondResponse(
+                reply_text=_ask_airtime_amount(lang, phone, network),
+                intent="slot_filling_airtime_amount",
+                next_state=updated
+            )
+
+        amt_fmt = updated["amount_naira"]
+        summary = _r(lang, {
+            Language.HAUSA: f"Kuna son sayen katin waya na {network} Naira {amt_fmt} don {phone}.",
+            Language.IGBO: f"Ị chọrọ ịzụta kredit {network} nke Naira {amt_fmt} maka {phone}.",
+            Language.YORUBA: f"Ẹ fẹ ra kaadi {network} ti Naira {amt_fmt} fun {phone}.",
+            Language.NIGERIAN_ENGLISH: f"You want to buy {amt_fmt} Naira {network} airtime for {phone}."
+        })
+        return AgentRespondResponse(
+            reply_text=_ask_pin_privacy(lang, summary),
+            intent="pin_privacy_prompt",
+            next_state=updated
+        )
+
+    if pending.get("pending_action_type") == "data":
+        updated = dict(pending)
+        phone = _extract_phone_number(req.text) or slots.get("phone_number")
+        if phone:
+            updated["phone"] = phone
+            updated["network"] = _detect_network(phone)
+        net = _extract_network_from_text(req.text) or slots.get("network")
+        if net:
+            updated["network"] = net
+
+        plan = _extract_data_plan(req.text)
+        if plan:
+            updated["plan_name"] = plan["name"]
+            updated["amount_kobo"] = plan["amount_kobo"]
+            updated["amount_naira"] = f"{plan['amount_naira']:,}"
+        elif slots.get("data_plan"):
+            updated["plan_name"] = slots["data_plan"]
+            amt = slots.get("amount", 1000)
+            updated["amount_kobo"] = amt * 100
+            updated["amount_naira"] = f"{amt:,}"
+
+        phone = updated.get("phone", caller_id)
+        network = updated.get("network", _detect_network(phone))
+
+        if not updated.get("plan_name"):
+            return AgentRespondResponse(
+                reply_text=_ask_data_plan(lang, phone, network),
+                intent="slot_filling_data_plan",
+                next_state=updated
+            )
+
+        amt_fmt = updated.get("amount_naira", "1,000")
+        plan_name = updated["plan_name"]
+        summary = _r(lang, {
+            Language.HAUSA: f"Kuna son sayen data {network} {plan_name} kan Naira {amt_fmt} don {phone}.",
+            Language.IGBO: f"Ị chọrọ ịzụta data {network} {plan_name} maka Naira {amt_fmt} maka {phone}.",
+            Language.YORUBA: f"Ẹ fẹ ra data {network} {plan_name} fun Naira {amt_fmt} fun {phone}.",
+            Language.NIGERIAN_ENGLISH: f"You want to buy {network} {plan_name} data bundle for {phone} at {amt_fmt} Naira."
         })
         return AgentRespondResponse(
             reply_text=_ask_pin_privacy(lang, summary),
@@ -1117,19 +1459,110 @@ async def _run_state_machine(
 
     # Airtime
     if intent == "airtime":
-        idem_key = f"idem_airtime_{secrets.token_hex(6)}"
-        airtime_res = await tools.buy_airtime(
-            account_id=account_id, phone_number=caller_id, network="MTN",
-            amount_kobo=100_000, idempotency_key=idem_key, session_id=req.session_id
-        )
-        tool_records.append(ToolCallRecord(tool="buy_airtime", arguments={"phone": caller_id}, result=airtime_res))
-        airtime_replies = {
-            Language.HAUSA: "An tura katin waya na Naira 1,000 zuwa lambar ku.",
-            Language.IGBO: "E zigara kredit nke Naira otu puku na akara ekwenti gi.",
-            Language.YORUBA: "A ti ra kaadi foonu ti egbewa Naira kan si noba yin.",
-            Language.NIGERIAN_ENGLISH: "1,000 Naira airtime top-up has been credited to your phone number."
+        phone = _extract_phone_number(req.text) or slots.get("phone_number") or caller_id
+        net = _extract_network_from_text(req.text) or slots.get("network") or _detect_network(phone)
+        amount_naira = slots.get("amount") or _parse_amount(req.text)
+        amount_kobo = amount_naira * 100 if amount_naira else None
+
+        new_pending: Dict[str, Any] = {
+            "pending_action_type": "airtime",
+            "phone": phone,
+            "network": net
         }
-        return AgentRespondResponse(reply_text=_r(lang, airtime_replies), intent="buy_airtime", tool_calls=tool_records)
+        if amount_kobo:
+            new_pending["amount_kobo"] = amount_kobo
+            new_pending["amount_naira"] = f"{amount_naira:,}"
+
+        if not amount_kobo:
+            return AgentRespondResponse(
+                reply_text=_ask_airtime_amount(lang, phone, net),
+                intent="slot_filling_airtime_amount",
+                next_state=new_pending
+            )
+
+        amt_fmt = f"{amount_naira:,}"
+        if auth == AuthLevel.NONE:
+            summary = _r(lang, {
+                Language.HAUSA: f"Kuna son sayen katin waya na {net} Naira {amt_fmt} don {phone}.",
+                Language.IGBO: f"Ị chọrọ ịzụta kredit {net} nke Naira {amt_fmt} maka {phone}.",
+                Language.YORUBA: f"Ẹ fẹ ra kaadi {net} ti Naira {amt_fmt} fun {phone}.",
+                Language.NIGERIAN_ENGLISH: f"You want to buy {amt_fmt} Naira {net} airtime for {phone}."
+            })
+            return AgentRespondResponse(
+                reply_text=_ask_pin_privacy(lang, summary),
+                intent="pin_privacy_prompt",
+                next_state=new_pending
+            )
+
+        # Authenticated: go straight to confirmation
+        return AgentRespondResponse(
+            reply_text=_confirm_airtime_prompt(lang, amt_fmt, phone, net),
+            intent="quote_airtime",
+            needs_confirmation=True,
+            next_state={
+                "action": "confirm_airtime",
+                "phone": phone,
+                "network": net,
+                "amount_kobo": amount_kobo,
+                "amount_naira": amt_fmt
+            }
+        )
+
+    # Data Bundle
+    if intent == "buy_data":
+        phone = _extract_phone_number(req.text) or slots.get("phone_number") or caller_id
+        net = _extract_network_from_text(req.text) or slots.get("network") or _detect_network(phone)
+        plan = _extract_data_plan(req.text)
+        plan_name = plan["name"] if plan else slots.get("data_plan")
+        amount_naira = plan["amount_naira"] if plan else slots.get("amount")
+        amount_kobo = (amount_naira * 100) if amount_naira else (plan["amount_kobo"] if plan else None)
+
+        new_pending: Dict[str, Any] = {
+            "pending_action_type": "data",
+            "phone": phone,
+            "network": net
+        }
+        if plan_name:
+            new_pending["plan_name"] = plan_name
+        if amount_kobo:
+            new_pending["amount_kobo"] = amount_kobo
+            new_pending["amount_naira"] = f"{amount_naira:,}"
+
+        if not plan_name:
+            return AgentRespondResponse(
+                reply_text=_ask_data_plan(lang, phone, net),
+                intent="slot_filling_data_plan",
+                next_state=new_pending
+            )
+
+        amt_fmt = new_pending.get("amount_naira", "1,000")
+        if auth == AuthLevel.NONE:
+            summary = _r(lang, {
+                Language.HAUSA: f"Kuna son sayen data {net} {plan_name} kan Naira {amt_fmt} don {phone}.",
+                Language.IGBO: f"Ị chọrọ ịzụta data {net} {plan_name} maka Naira {amt_fmt} maka {phone}.",
+                Language.YORUBA: f"Ẹ fẹ ra data {net} {plan_name} fun Naira {amt_fmt} fun {phone}.",
+                Language.NIGERIAN_ENGLISH: f"You want to buy {net} {plan_name} data bundle for {phone} at {amt_fmt} Naira."
+            })
+            return AgentRespondResponse(
+                reply_text=_ask_pin_privacy(lang, summary),
+                intent="pin_privacy_prompt",
+                next_state=new_pending
+            )
+
+        # Authenticated: go straight to confirmation
+        return AgentRespondResponse(
+            reply_text=_confirm_data_prompt(lang, plan_name, amt_fmt, phone, net),
+            intent="quote_data",
+            needs_confirmation=True,
+            next_state={
+                "action": "confirm_data",
+                "phone": phone,
+                "network": net,
+                "plan_name": plan_name,
+                "amount_kobo": amount_kobo,
+                "amount_naira": amt_fmt
+            }
+        )
 
     # Unknown / fallback
     return AgentRespondResponse(reply_text=_unknown_reply(lang), intent="unknown")
@@ -1185,14 +1618,17 @@ Caller language: {lang_name}. {pending_ctx}
 
 Extract the caller's intent. Return ONLY valid JSON with this exact shape:
 {{
-  "intent": "<one of: greeting | check_balance | transfer | pay_bill | airtime | help | confirm_yes | confirm_no | cancel | repeat_last | unknown>",
+  "intent": "<one of: greeting | check_balance | transfer | pay_bill | airtime | buy_data | help | confirm_yes | confirm_no | cancel | repeat_last | unknown>",
   "slots": {{
     "amount": <Naira number or null>,
     "beneficiary": "<name or null>",
     "account_number": "<10-digit number or null>",
     "bank_name": "<bank name or null>",
     "meter_number": "<meter number or null>",
-    "bill_type": "<electricity|water|cable or null>"
+    "bill_type": "<electricity|water|cable or null>",
+    "phone_number": "<11-digit phone number or null>",
+    "network": "<MTN|Airtel|Glo|9mobile or null>",
+    "data_plan": "<1GB|2.5GB|5GB|10GB or null>"
   }},
   "reply_hint": ""
 }}
@@ -1204,6 +1640,8 @@ Rules:
 - "what is my balance" / "duba kudi na" / "how much i get" -> intent=check_balance
 - "pay NEPA" / "pay electricity" / "san owo ina" / "kudin wuta" / "electricity" -> intent=pay_bill, slots.bill_type="electricity"
 - "meter 45129038101" / "45129038101" -> slots.meter_number="45129038101"
+- "buy airtime" / "recharge 1000" / "katin waya" / "kaadi ipe" -> intent=airtime
+- "buy data" / "buy 2GB data" / "sayen data" / "ra data" -> intent=buy_data, slots.data_plan="2.5GB"
 - "yes" / "proceed" / "ehen" / "beeni" / "o ya" / "oya" -> intent=confirm_yes
 - "no" / "cancel" / "mba" / "a'a" -> intent=cancel
 - NEVER default to check_balance when unsure. If unclear -> intent=unknown
@@ -1254,7 +1692,10 @@ Return ONLY JSON. No other text."""
             "slot_filling_beneficiary", "slot_filling_amount", "slot_filling_account_bank",
             "slot_filling_meter", "meter_verified_ask_amount", "quote_bill", "bill_completed",
             "bill_cancelled", "awaiting_bill_confirmation", "low_confidence_reprompt",
-            "awaiting_confirmation", "mid_flow_correction", "digression_balance"
+            "awaiting_confirmation", "mid_flow_correction", "digression_balance",
+            "quote_airtime", "airtime_completed", "airtime_cancelled", "awaiting_airtime_confirmation",
+            "slot_filling_airtime_amount", "quote_data", "data_completed", "data_cancelled",
+            "awaiting_data_confirmation", "slot_filling_data_plan"
         }
         if intent in DETERMINISTIC_INTENTS or not self.api_key:
             return reply

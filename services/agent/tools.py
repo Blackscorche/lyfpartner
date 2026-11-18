@@ -140,6 +140,25 @@ class ToolRegistry:
                 logger.error(f"Error buying airtime: {e}")
                 return {"error": str(e)}
 
+    async def buy_data(self, account_id: str, phone_number: str, network: str, plan_name: str, amount_kobo: int, idempotency_key: str, session_id: Optional[str] = None) -> Dict[str, Any]:
+        """Buy internet data bundle."""
+        async with async_session_maker() as session:
+            try:
+                tx = await self.bank_provider.buy_data(
+                    session=session,
+                    account_id=account_id,
+                    phone_number=phone_number,
+                    network=network,
+                    plan_name=plan_name,
+                    amount_kobo=amount_kobo,
+                    idempotency_key=idempotency_key,
+                    session_id=session_id
+                )
+                return tx.model_dump()
+            except Exception as e:
+                logger.error(f"Error buying data: {e}")
+                return {"error": str(e)}
+
     async def report_issue(self, session_id: str, customer_id: Optional[str], subject: str, description: str) -> Dict[str, Any]:
         """Log a customer complaint/ticket."""
         async with async_session_maker() as session:

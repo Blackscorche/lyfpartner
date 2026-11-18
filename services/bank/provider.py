@@ -67,6 +67,10 @@ class BankProvider(ABC):
         pass
 
     @abstractmethod
+    async def buy_data(self, session: AsyncSession, account_id: str, phone_number: str, network: str, plan_name: str, amount_kobo: int, idempotency_key: str, session_id: Optional[str] = None) -> Transaction:
+        pass
+
+    @abstractmethod
     async def get_limits(self, session: AsyncSession, account_id: str) -> DailyLimitsResponse:
         pass
 
@@ -456,6 +460,66 @@ class MockBankProvider(BankProvider):
         idem = IdempotencyModel(
             idempotency_key=idempotency_key,
             action="airtime_buy",
+            response_json=json.dumps(tx_response.model_dump(), default=str)
+        )
+        session.add(idem)
+        await session.commit()
+        return tx_response
+
+    async def buy_data(self, session: AsyncSession, account_id: str, phone_number: str, network: str, plan_name: str, amount_kobo: int, idempotency_key: str, session_id: Optional[str] = None) -> Transaction:
+        # Check idempotency
+        idempotent_rec = await session.execute(
+            select(IdempotencyModel).where(IdempotencyModel.idempotency_key == idempotency_key)
+        )
+        existing = idempotent_rec.scalar_one_or_none()
+        if existing:
+            data = json.loads(existing.response_json)
+            return Transaction(**data)
+
+        acc = await self.get_account(session, account_id)
+        if acc.balance_kobo < amount_kobo:
+            raise InsufficientFundsException()
+
+        acc_model = await session.get(AccountModel, acc.account_id)
+        acc_model.balance_kobo -= amount_kobo
+
+        tx_id = f"tx_data_{secrets.token_hex(6)}"
+        ref = f"DATA-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}-{secrets.token_hex(3).upper()}"
+        tx = TransactionModel(
+            transaction_id=tx_id,
+            account_id=acc.account_id,
+            type="debit",
+            amount_kobo=amount_kobo,
+            narration=f"Data bundle ({plan_name}): {network.upper()} ({phone_number})",
+            reference=ref,
+            balance_after_kobo=acc_model.balance_kobo
+        )
+        session.add(tx)
+
+        audit = AuditLogModel(
+            actor=acc.customer_id,
+            action="data_purchased",
+            session_id=session_id,
+            resource_id=tx_id,
+            result="success",
+            details_json=json.dumps({"phone": phone_number, "network": network, "plan": plan_name, "amount_kobo": amount_kobo})
+        )
+        session.add(audit)
+
+        tx_response = Transaction(
+            transaction_id=tx.transaction_id,
+            account_id=tx.account_id,
+            type=tx.type,
+            amount_kobo=tx.amount_kobo,
+            narration=tx.narration,
+            reference=tx.reference,
+            balance_after_kobo=tx.balance_after_kobo,
+            created_at=datetime.utcnow()
+        )
+
+        idem = IdempotencyModel(
+            idempotency_key=idempotency_key,
+            action="data_buy",
             response_json=json.dumps(tx_response.model_dump(), default=str)
         )
         session.add(idem)

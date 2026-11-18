@@ -334,3 +334,80 @@ async def test_balance_only_read_when_intent_is_check_balance():
         t3 = await _turn(client, sid, "1234")
         assert "250,000" in t3["reply_text"], f"After PIN, balance should be shown. Got: {t3['reply_text']}"
         assert t3["intent"] == "check_balance"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# VTU: Airtime and Data Bundle Flows
+# ─────────────────────────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_vtu_airtime_multiturn_flow():
+    """
+    Airtime flow:
+    Turn 1: 'I want to buy airtime' -> asks amount
+    Turn 2: '1000 naira' -> asks for PIN with summary
+    Turn 3: '1234' -> quotes airtime and asks to confirm
+    Turn 4: 'yes' -> airtime_completed + SMS receipt
+    """
+    transport = ASGITransport(app=unified_app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        sid = await _create_session(client, caller_id="+2348030000001")
+
+        # Turn 1: Airtime intent without amount
+        t1 = await _turn(client, sid, "I want to buy airtime")
+        assert t1["intent"] in ("slot_filling_airtime_amount", "airtime")
+        assert "how much" in t1["reply_text"].lower() or "amount" in t1["reply_text"].lower() or "airtime" in t1["reply_text"].lower()
+        assert t1["pending_action"]["pending_action_type"] == "airtime"
+
+        # Turn 2: Provide amount
+        t2 = await _turn(client, sid, "1000 naira")
+        assert t2["intent"] == "pin_privacy_prompt"
+        assert "1,000" in t2["reply_text"] or "1000" in t2["reply_text"]
+        assert "pin" in t2["reply_text"].lower()
+
+        # Turn 3: Submit 4-digit PIN
+        t3 = await _turn(client, sid, "1234")
+        assert t3["intent"] == "quote_airtime"
+        assert t3["pending_action"]["action"] == "confirm_airtime"
+        assert "confirm" in t3["reply_text"].lower() or "proceed" in t3["reply_text"].lower()
+
+        # Turn 4: Confirm purchase
+        t4 = await _turn(client, sid, "yes proceed")
+        assert t4["intent"] == "airtime_completed"
+        assert "successful" in t4["reply_text"].lower() or "nasara" in t4["reply_text"].lower()
+
+
+@pytest.mark.asyncio
+async def test_vtu_data_multiturn_flow():
+    """
+    Data bundle flow:
+    Turn 1: 'I want to buy data' -> asks which data plan
+    Turn 2: '2.5GB' -> asks for PIN with summary
+    Turn 3: '1234' -> quotes data bundle and asks to confirm
+    Turn 4: 'yes' -> data_completed + SMS confirmation
+    """
+    transport = ASGITransport(app=unified_app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        sid = await _create_session(client, caller_id="+2348030000001")
+
+        # Turn 1: Data intent without plan
+        t1 = await _turn(client, sid, "I want to buy data")
+        assert t1["intent"] in ("slot_filling_data_plan", "buy_data")
+        assert "plan" in t1["reply_text"].lower() or "gb" in t1["reply_text"].lower()
+        assert t1["pending_action"]["pending_action_type"] == "data"
+
+        # Turn 2: Provide plan
+        t2 = await _turn(client, sid, "2.5GB")
+        assert t2["intent"] == "pin_privacy_prompt"
+        assert "2.5gb" in t2["reply_text"].lower()
+        assert "pin" in t2["reply_text"].lower()
+
+        # Turn 3: Submit 4-digit PIN
+        t3 = await _turn(client, sid, "1234")
+        assert t3["intent"] == "quote_data"
+        assert t3["pending_action"]["action"] == "confirm_data"
+
+        # Turn 4: Confirm purchase
+        t4 = await _turn(client, sid, "yes")
+        assert t4["intent"] == "data_completed"
+        assert "successful" in t4["reply_text"].lower() or "activated" in t4["reply_text"].lower()
