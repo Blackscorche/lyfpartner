@@ -31,24 +31,26 @@ DISTRESS_KEYWORDS = [
 CONFIRMATION_KEYWORDS = [
     "yes", "confirm", "proceed", "send it", "pay it", "okay", "ok", "correct",
     "eh", "ehen", "bee ne", "haka ne", "ee", "e-e", "beeni", "o ya", "oya",
-    "go ahead", "do it", "affirmative", "right", "sure"
+    "go ahead", "do it", "affirmative", "right", "sure",
+    "i mana", "ii", "ci gaba", "aika shi", "toh", "to", "haka", "yauwa", "yawwa"
 ]
 
 CANCEL_KEYWORDS = [
     "no", "cancel", "stop", "a'a", "mba", "rara", "don't", "dont",
-    "abort", "back", "quit", "nevermind", "never mind"
+    "abort", "back", "quit", "nevermind", "never mind",
+    "fasa", "dakatar", "ba na so", "bar shi"
 ]
 
 REPEAT_KEYWORDS = [
     "repeat", "say again", "pardon", "maimaita", "kwuo ozo", "so leekan si",
-    "what did you say", "come again"
+    "what did you say", "come again", "ban ji ba", "sake fada"
 ]
 
 TRANSFER_KEYWORDS = [
     "send", "transfer", "tura", "ziga", "fi ranse", "give",
     "move money", "move", "wire", "remit", "i want to send", "i want to transfer",
     "i want to make a transfer", "make transfer", "wanna send", "wanna transfer",
-    "tura kudi", "aika kudi",
+    "tura kudi", "aika kudi", "aika", "ba da kudi",
     "gbe owo", "fi owo ranse",
     "zipu ego", "ziga ego",
 ]
@@ -57,12 +59,15 @@ BALANCE_KEYWORDS = [
     "balance", "duba kudi", "kudi na", "ego ole", "ile ego",
     "iye owo", "owo mi", "how much", "how much i get", "check my account",
     "check balance", "my balance", "account balance",
+    "ragowar kudi", "ragowa", "asusu na", "asusu", "kudin account",
+    "nawa nake da shi", "ina da nawa", "nawa ne a asusu", "nawa ne kudi na",
+    "nawa kudi", "kudi nawa"
 ]
 
 BILL_KEYWORDS_EN = ["electricity", "nepa", "light bill", "meter", "ikedc", "ekedc", "utility"]
 BILL_KEYWORDS_YO = ["owo ina", "san owo ina"]
 BILL_KEYWORDS_IG = ["ugwo oku", "kwo ugwo oku"]
-BILL_KEYWORDS_HA = ["kudin wuta", "wutan lantarki", "biya wuta"]
+BILL_KEYWORDS_HA = ["kudin wuta", "wutan lantarki", "biya wuta", "kudin nepa", "wuta"]
 
 HELP_KEYWORDS = [
     "help", "service", "services", "options", "what can you do",
@@ -71,16 +76,17 @@ HELP_KEYWORDS = [
 
 AIRTIME_KEYWORDS = [
     "airtime", "recharge", "topup", "top up", "credit", "katin waya", "kaadi ipe",
-    "buy airtime", "send airtime", "sayen katin waya", "ra kaadi"
+    "buy airtime", "send airtime", "sayen katin waya", "ra kaadi", "sanya katin", "kati"
 ]
 DATA_KEYWORDS = [
     "data", "internet", "bundle", "gig", "browse", "browsing", "megabyte", "gigabyte",
-    "sayen data", "ra data", "zuta data", "data bundle", "buy data"
+    "sayen data", "ra data", "zuta data", "data bundle", "buy data", "kunshin data", "intanet"
 ]
 
 GREETING_KEYWORDS = [
     "hello", "hi", "good morning", "good afternoon", "good evening",
-    "sannu", "barka", "bawo ni", "bawo", "ndewo", "kedu", "eku"
+    "sannu", "barka", "bawo ni", "bawo", "ndewo", "kedu", "eku",
+    "ina kwana", "ina wuni", "yaya dai", "yaya kake", "yaya kuke"
 ]
 
 # ─────────────────────── Nigerian number normaliser ──────────────────────────
@@ -89,9 +95,71 @@ _NAIRA_WORDS = {
     "k": 1_000, "thousand": 1_000, "million": 1_000_000, "m": 1_000_000,
 }
 
+_SPOKEN_AMOUNTS = {
+    # Hausa spoken amounts
+    "dubu dari": 100_000,
+    "dubu hamsin": 50_000,
+    "dubu ashirin": 20_000,
+    "dubu goma": 10_000,
+    "dubu tara": 9_000,
+    "dubu takwas": 8_000,
+    "dubu bakwai": 7_000,
+    "dubu shida": 6_000,
+    "dubu biyar": 5_000,
+    "dubu hudu": 4_000,
+    "dubu uku": 3_000,
+    "dubu biyu": 2_000,
+    "dubu daya": 1_000,
+    "dubu": 1_000,
+    "dari biyar": 500,
+    "dari daya": 100,
+    # Yoruba spoken amounts
+    "egberun mewa": 10_000,
+    "egberun mejo": 8_000,
+    "egberun meje": 7_000,
+    "egberun mefa": 6_000,
+    "egberun marun": 5_000,
+    "egberun merin": 4_000,
+    "egberun meta": 3_000,
+    "egberun meji": 2_000,
+    "egberun kan": 1_000,
+    "egberun": 1_000,
+    # Igbo spoken amounts
+    "puku iri": 10_000,
+    "puku itoolu": 9_000,
+    "puku asato": 8_000,
+    "puku asaa": 7_000,
+    "puku isii": 6_000,
+    "puku ise": 5_000,
+    "puku ano": 4_000,
+    "puku ato": 3_000,
+    "puku abuo": 2_000,
+    "puku otu": 1_000,
+    "puku nani": 1_000,
+    "puku": 1_000,
+    # English spoken words
+    "one hundred thousand": 100_000,
+    "fifty thousand": 50_000,
+    "twenty thousand": 20_000,
+    "ten thousand": 10_000,
+    "nine thousand": 9_000,
+    "eight thousand": 8_000,
+    "seven thousand": 7_000,
+    "six thousand": 6_000,
+    "five thousand": 5_000,
+    "four thousand": 4_000,
+    "three thousand": 3_000,
+    "two thousand": 2_000,
+    "one thousand": 1_000,
+    "five hundred": 500,
+}
+
 def _parse_amount(text: str) -> Optional[int]:
-    """Return naira amount from text like '5k', '5000', '5,000'."""
+    """Return naira amount from text like '5k', '5000', 'dubu biyar', 'egberun marun'."""
     t = text.lower().replace(",", "")
+    for phrase, val in _SPOKEN_AMOUNTS.items():
+        if phrase in t:
+            return val
     m = re.search(r'(\d[\d\s]*)([km]|thousand|million)?', t)
     if not m:
         return None

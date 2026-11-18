@@ -74,15 +74,15 @@ class TurnPipeline:
             transcribed_text = "Hello"
 
         # Auto-detect language switch if caller switched tongues
-        if transcribed_text and len(transcribed_text.split()) >= 2:
+        if transcribed_text and len(transcribed_text.split()) >= 1:
             lower = transcribed_text.lower()
-            if any(w in lower for w in ["sannu", "ina son", "kudi", "ragowar", "tura"]):
+            if any(w in lower for w in ["sannu", "ina son", "kudi", "ragowar", "tura", "asusu", "dubu", "aika", "barka", "ina kwana", "ina wuni"]):
                 curr_lang = Language.HAUSA
                 session.language = Language.HAUSA.value
-            elif any(w in lower for w in ["bawo", "mo fe", "owo", "eku"]):
+            elif any(w in lower for w in ["bawo", "mo fe", "owo", "eku", "egberun", "san owo"]):
                 curr_lang = Language.YORUBA
                 session.language = Language.YORUBA.value
-            elif any(w in lower for w in ["ndewo", "kedu", "ego", "biko"]):
+            elif any(w in lower for w in ["ndewo", "kedu", "ego", "biko", "puku", "ziga"]):
                 curr_lang = Language.IGBO
                 session.language = Language.IGBO.value
             elif any(w in lower for w in ["balance", "transfer", "send money", "hello", "check", "naira", "account"]):

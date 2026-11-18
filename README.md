@@ -57,14 +57,15 @@ Unlike traditional IVR systems that play pre-recorded clips and force "press 1 f
 - **Natural intent detection** — The AI understands what the caller wants from freeform speech, in any of the 4 languages, without keyword menus.
 - **Conversational-first flow** — On connect, the AI greets warmly and asks *what you need*, never demanding a PIN upfront. PIN is only requested after the caller states their intent.
 - **Real account context** — The AI is told the caller's live balance and saved beneficiaries before each response, so it speaks to their actual situation.
-- **Multi-turn memory** — The AI remembers what was just said and maintains a coherent conversation across turns.
-- **Zero hallucination on money** — All financial transactions (PIN verification, transfer execution, bill payment) are handled by deterministic Python routines. The LLM can never invent or move money.
+- **Multi-turn memory & slot filling** — The AI naturally collects missing information step-by-step (e.g. amount, 10-digit NUBAN account number, bank name, meter number, or data plan) across turns.
+- **Mid-flow digression & correction** — Callers can pause mid-transaction to check their balance (*"wait, what is my balance?"*), modify amounts (*"make it 7000 instead"*), or cancel cleanly without breaking context.
+- **Zero hallucination on money** — All financial transactions (PIN verification, NIP transfer execution, DisCo bill payments, VTU airtime/data purchases) are handled by deterministic Python routines. The LLM can never invent or move money.
 
 ### Groq handles:
-Greetings · Intent acknowledgment · PIN prompts · Help questions · Language clarification · Small talk · Anything conversational
+Greetings · Natural intent recognition · Conversational clarification · Help questions · Language switching · Spoken summaries · Contextual guidance
 
 ### Deterministic code handles:
-PIN hash verification (PBKDF2) · Transfer execution (NIP ledger) · Bill payment · SMS receipt delivery · Transfer confirmation/cancellation
+PIN hash verification (PBKDF2) · NIP transfer execution · Unsaved beneficiary NUBAN validation · DisCo meter verification & 20-digit token generation · Telco airtime & data bundle execution · SMS receipt delivery · Transfer confirmation & cancellation
 
 ---
 
@@ -118,38 +119,74 @@ All audio is returned as base64-encoded PCM WAV per turn — no streaming depend
 
 ### Demo 1: Balance Inquiry
 1. Open the live URL and tap the green call button.
-2. The AI greets you warmly and asks what you need (no PIN demand).
+2. The AI greets you warmly and asks what you need (no upfront PIN demand).
 3. Say: **"What is my account balance?"**
-4. The AI acknowledges, tells you to enter your PIN for security.
-5. Say: **"1 2 3 4"** or punch it on the keypad.
+4. The AI acknowledges and asks for your 4-digit PIN with a privacy reminder.
+5. Say: **"1 2 3 4"** (or punch it on the keypad).
 6. Balance is read back: *"Your account balance is 250,000 Naira."*
 
-### Demo 2: Money Transfer
+### Demo 2: Money Transfer (Saved Beneficiary)
 1. After greeting, say: **"I want to send 5,000 Naira to Musa."**
-2. AI confirms the intent and asks for PIN (privacy reminder included).
-3. Enter PIN → AI confirms amount & beneficiary → asks *"Should I go ahead?"*
-4. Say: **"Yes"** / **"Oya"** / **"Proceed"**
-5. Transfer executes, SMS receipt sent.
+2. AI confirms the intent, asks for your PIN with an eavesdropping privacy prompt.
+3. Enter PIN (`1234`) $\rightarrow$ AI generates a real NIP quote with transaction fees: *"Confirm transfer of 5,000 Naira to Musa Ibrahim (Zenith Bank). Fee is 10 Naira. Should I go ahead?"*
+4. Say: **"Yes"** / **"Proceed"** / **"Oya"**
+5. Transfer executes instantly, balance debited, and SMS receipt dispatched.
 
-### Demo 3: Multilingual
-1. Select **HA**, **YO**, or **IG** language on the top bar.
-2. Speak in that language — AI responds in the same language end-to-end.
-3. Hausa: *"Ina son in duba ragowar kudi na"* → balance in Hausa.
-4. Yoruba: *"Mo fe san owo ina"* → electricity bill flow in Yoruba.
+### Demo 3: Money Transfer to Unsaved Beneficiary
+1. Say: **"I want to transfer 10,000 Naira."**
+2. AI asks who you want to send money to.
+3. Say: **"Ibrahim"** (not in your saved beneficiaries).
+4. AI asks for Ibrahim's 10-digit account number and destination bank.
+5. Say: **"Account 0123456789 GTBank."**
+6. AI validates the NUBAN details, prompts for PIN, quotes the transfer, and executes upon your spoken confirmation.
+
+### Demo 4: Bill Payment with Meter Verification & Token Generation
+1. Say: **"I want to pay my NEPA electricity bill."**
+2. AI asks for your meter number.
+3. Say: **"45129038101"**
+4. AI contacts the DisCo, verifies customer name (*"Aminu Kano"*), and asks how much you'd like to pay.
+5. Say: **"3,000 Naira"** $\rightarrow$ Enter PIN $\rightarrow$ Spoken confirmation.
+6. Payment succeeds! AI speaks your 20-digit electricity recharge token (`0481-9283-7182-9384-5120`) and dispatches it immediately via SMS.
+
+### Demo 5: VTU Airtime Top-Up
+1. Say: **"I want to buy airtime."**
+2. AI detects your carrier from your phone prefix (e.g., MTN for `0803`, Airtel for `0802`) and asks for the amount.
+3. Say: **"1,000 Naira"** (or in one turn: *"Recharge 1000 MTN"*).
+4. Enter PIN $\rightarrow$ Confirm with *"Yes"* $\rightarrow$ Airtime topped up with SMS receipt.
+
+### Demo 6: Internet Data Bundle Purchase
+1. Say: **"I want to buy data."**
+2. AI asks which plan you want (options: `1GB` @ 500 NGN, `2.5GB` @ 1,000 NGN, `5GB` @ 1,500 NGN, `10GB` @ 3,000 NGN).
+3. Say: **"2.5GB"** (or in one turn: *"Buy 2.5GB data bundle"*).
+4. AI quotes the bundle and prompts for PIN.
+5. Enter PIN $\rightarrow$ Confirm with *"Yes"* $\rightarrow$ Data bundle activated instantly with SMS confirmation.
+
+### Demo 7: Mid-Flow Digressions & Corrections
+1. In the middle of any transfer quote, say: **"Wait, what is my balance?"**
+2. AI states your balance and offers to resume your pending transfer without restarting.
+3. Say: **"Change amount to 7,000"** $\rightarrow$ AI updates the amount dynamically.
+4. Say: **"Cancel"** $\rightarrow$ AI safely cancels the pending action with zero penalty.
+
+### Demo 8: Multilingual Voice Banking
+1. Select **HA**, **YO**, or **IG** on the top language selector (or speak naturally in your dialect).
+2. AI switches language dynamically and responds in the exact same tongue:
+   - **Hausa:** *"Ina son in duba ragowar kudi na"* $\rightarrow$ Balance check in Hausa.
+   - **Yoruba:** *"Mo fe san owo ina"* $\rightarrow$ Electricity bill flow in Yoruba.
+   - **Igbo:** *"Achọrọ m izipu puku ise nye Musa"* $\rightarrow$ 5,000 Naira transfer to Musa in Igbo.
 
 ---
 
 ## 🛠️ Technology Stack
 
-| Layer | Technology |
-|---|---|
-| Backend | Python 3.11+, FastAPI (unified server) |
-| ASR | Groq Whisper Large v3 Turbo (`whisper-large-v3-turbo`) |
-| LLM | Groq API — `llama-3.3-70b-versatile` (all dialogue turns) |
-| TTS | Microsoft Edge Neural TTS (`en-NG-EzinneNeural`) + Google TTS |
-| Frontend | React 19, Vite, pure CSS phone UI |
-| Database | SQLite + SQLAlchemy async (NIP ledger, audit logs) |
-| Deployment | Railway (auto-deploy from GitHub `main`) |
+| Layer | Technology | Description |
+|---|---|---|
+| **Backend** | Python 3.11+, FastAPI (unified server) | Async pipeline, rate limiting, request correlation |
+| **ASR (Speech-to-Text)** | Groq Whisper Large v3 Turbo (`whisper-large-v3-turbo`) | Sub-second audio transcription with multilingual code-switching |
+| **LLM Reasoning** | Groq API — `llama-3.3-70b-versatile` / `qwen/qwen3.8-27b` | Conversational dialogue, intent extraction, slot filling |
+| **TTS (Text-to-Speech)** | Microsoft Edge Neural TTS (`en-NG-EzinneNeural`) + Google TTS | Warm Nigerian female neural voice & native language synthesis |
+| **Browser Audio & VAD** | WebM audio chunks + Web Audio API | Instant barge-in, browser-independent fallback for Brave/Edge/Chrome/Safari |
+| **Database & Ledger** | SQLite + SQLAlchemy async | ACID NIP ledger, audit logs, idempotency tokens |
+| **Deployment** | Railway (auto-deploy from GitHub `main`) | Multi-stage Dockerized build with health checks |
 
 ---
 
@@ -176,13 +213,13 @@ LLM_PROVIDER=groq
 TTS_PROVIDER=natural
 ASR_PROVIDER=groq
 GROQ_API_KEY=your_groq_api_key_here
-GROQ_MODEL=llama-3.3-70b-versatile
+GROQ_MODEL=llama-3.3-70b-versatile  # or qwen/qwen3.8-27b
 
 # Run
 python run.py
 ```
 
-Open **`http://localhost:8000`** in Chrome, Edge, or Safari.
+Open **`http://localhost:8000`** in Chrome, Brave, Edge, or Safari.
 
 ---
 
@@ -190,11 +227,18 @@ Open **`http://localhost:8000`** in Chrome, Edge, or Safari.
 
 ```bash
 source .venv/bin/activate
-pytest -v
+pytest tests/ -v
 ```
 
-**15/15 tests passing — 100% green.**  
-Tests run with mocked LLM/TTS providers so they never hit the network.
+**30/30 tests passing — 100% green.**  
+Test coverage includes:
+- Multi-turn conversational transfers (saved & unsaved beneficiaries)
+- DisCo pre-payment customer validation & 20-digit token generation
+- VTU Airtime and Internet Data bundle end-to-end multi-turn flows
+- Spoken and keypad DTMF PIN authentication & privacy elevation
+- Mid-flow digressions (balance check mid-transfer) and mid-flow corrections
+- Multilingual Hausa, Yoruba, Igbo, and Nigerian English dialogue
+- Admin security, audit logging, and NIP financial ledger immutability
 
 ---
 

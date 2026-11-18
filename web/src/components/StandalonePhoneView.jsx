@@ -660,6 +660,15 @@ export default function StandalonePhoneView({ selectedLanguage = 'en', onSelectL
               onClick={() => {
                 setCaptionLang(l.id)
                 if (onSelectLanguage) onSelectLanguage(l.id)
+                const sid = sessionIdRef.current || activeSessionId
+                if (sid) {
+                  const targetLang = l.id === 'en' ? 'en-ng' : l.id
+                  fetch(`/v1/sessions/${sid}/language`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ language: targetLang })
+                  }).catch(() => {})
+                }
               }}
               style={{
                 padding: '4px 8px',
