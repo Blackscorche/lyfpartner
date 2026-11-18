@@ -101,6 +101,98 @@ def _parse_amount(text: str) -> Optional[int]:
     return None
 
 
+NIGERIAN_BANKS = [
+    ("gtbank", "GTBank"),
+    ("gtb", "GTBank"),
+    ("guaranty trust", "GTBank"),
+    ("zenith", "Zenith Bank"),
+    ("zenith bank", "Zenith Bank"),
+    ("first bank", "First Bank"),
+    ("firstbank", "First Bank"),
+    ("fbn", "First Bank"),
+    ("access bank", "Access Bank"),
+    ("access", "Access Bank"),
+    ("uba", "UBA"),
+    ("united bank for africa", "UBA"),
+    ("kuda", "Kuda Bank"),
+    ("kuda bank", "Kuda Bank"),
+    ("opay", "OPay"),
+    ("palmpay", "PalmPay"),
+    ("palm pay", "PalmPay"),
+    ("stanbic", "Stanbic IBTC"),
+    ("stanbic ibtc", "Stanbic IBTC"),
+    ("fidelity", "Fidelity Bank"),
+    ("sterling", "Sterling Bank"),
+    ("union bank", "Union Bank"),
+    ("union", "Union Bank"),
+    ("fcmb", "FCMB"),
+    ("wema", "Wema Bank"),
+    ("alat", "Wema Bank"),
+    ("moniepoint", "Moniepoint"),
+    ("jaiz", "Jaiz Bank"),
+    ("taj", "Taj Bank"),
+]
+
+def _extract_beneficiary_from_text(text: str) -> Optional[str]:
+    """
+    Extract a plain-name beneficiary from short utterances like 'to Ibrahim' or 'Ibrahim'.
+    Returns None if no plausible single name is found.
+    """
+    _NOT_NAMES = {
+        "bank", "my", "account", "the", "make", "a", "do", "pay", "send", "transfer",
+        "check", "buy", "get", "give", "someone", "anyone", "this", "that", "him",
+        "her", "them", "you", "me", "it", "us", "who", "whom", "what", "how", "when",
+        "where", "why", "an", "another", "one", "two", "three", "four", "five",
+        "money", "cash", "naira", "ngn",
+    }
+    t = text.strip()
+    # Match "to <Name>" patterns
+    m = re.search(r'\b(?:to|ti|for|ga|si|nye)\s+([A-Za-z][A-Za-z]{1,20})', t, re.IGNORECASE)
+    if m:
+        name = m.group(1).strip()
+        if (name.lower() not in [b[0] for b in NIGERIAN_BANKS]
+                and name.lower() not in _NOT_NAMES):
+            return name.title()
+    # Very short utterance that's just a name (1-2 words, no digits)
+    words = [w for w in re.sub(r'[^A-Za-z\s]', '', t).split() if w]
+    if len(words) <= 2:
+        clean = " ".join(words).title()
+        clean_lower = clean.lower()
+        if (clean_lower not in [b[0] for b in NIGERIAN_BANKS]
+                and not any(w in _NOT_NAMES for w in clean_lower.split())
+                and len(clean) > 2):
+            return clean
+    return None
+
+
+def _extract_account_number(text: str) -> Optional[str]:
+    """Find a 10-digit Nigerian NUBAN account number."""
+    m = re.search(r'\b\d{10}\b', text)
+    if m:
+        return m.group(0)
+    digits_only = re.sub(r'[^\d]', '', text)
+    if len(digits_only) == 10:
+        return digits_only
+    return None
+
+def _extract_bank_name(text: str) -> Optional[str]:
+    t = text.lower()
+    for kw, standard_name in NIGERIAN_BANKS:
+        if re.search(r'\b' + re.escape(kw) + r'\b', t):
+            return standard_name
+    return None
+
+def _extract_meter_number(text: str) -> Optional[str]:
+    """Extract a 10 to 13 digit Nigerian electricity meter number."""
+    m = re.search(r'\b\d{10,13}\b', text)
+    if m:
+        return m.group(0)
+    digits_only = re.sub(r'[^\d]', '', text)
+    if 10 <= len(digits_only) <= 13:
+        return digits_only
+    return None
+
+
 def _extract_beneficiary_name(text: str, beneficiaries: List[Dict]) -> Optional[Dict]:
     """Return first beneficiary whose name/nickname appears in text."""
     t = text.lower()
@@ -120,18 +212,49 @@ def _extract_beneficiary_name(text: str, beneficiaries: List[Dict]) -> Optional[
 def _rule_based_intent(text: str, lang: Language, pending: Dict) -> Dict[str, Any]:
     """
     Fast deterministic intent + slot extraction — no LLM.
-    Returns: {intent, slots:{amount, beneficiary, bill_type}, reply_hint}
+    Returns: {intent, slots:{amount, beneficiary, bill_type, account_number, bank_name, meter_number}, reply_hint}
     """
     t = text.lower().strip()
-    slots: Dict[str, Any] = {"amount": None, "beneficiary": None, "bill_type": None}
+    slots: Dict[str, Any] = {
+        "amount": None,
+        "beneficiary": None,
+        "bill_type": None,
+        "account_number": None,
+        "bank_name": None,
+        "meter_number": None
+    }
 
     amount_naira = _parse_amount(t)
     if amount_naira:
         slots["amount"] = amount_naira
 
-    ben_match = re.search(r'(?:to|for|ga|si|nye)\s+([A-Za-z][A-Za-z\s]{1,20}?)(?:\s+(?:in|at|on|via|\d)|$)', text, re.IGNORECASE)
+    # Common English words that look like names after "to" but are NOT beneficiaries
+    _NOT_NAMES = {
+        "bank", "my", "account", "the", "make", "a", "do", "pay", "send", "transfer",
+        "check", "buy", "get", "give", "someone", "anyone", "this", "that", "him",
+        "her", "them", "you", "me", "it", "us", "who", "whom", "what", "how", "when",
+        "where", "why", "an", "another", "one", "two", "three", "four", "five",
+    }
+    ben_match = re.search(r'(?:to|ti|for|ga|si|nye)\s+([A-Za-z][A-Za-z\s]{1,20}?)(?:\s+(?:in|at|on|via|account|bank|\d)|$)', text, re.IGNORECASE)
     if ben_match:
-        slots["beneficiary"] = ben_match.group(1).strip()
+        cand = ben_match.group(1).strip()
+        cand_lower = cand.lower()
+        if (cand_lower not in [b[0] for b in NIGERIAN_BANKS]
+                and cand_lower not in _NOT_NAMES
+                and not any(word in _NOT_NAMES for word in cand_lower.split())):
+            slots["beneficiary"] = cand
+
+    acct_no = _extract_account_number(text)
+    if acct_no:
+        slots["account_number"] = acct_no
+
+    bank = _extract_bank_name(text)
+    if bank:
+        slots["bank_name"] = bank
+
+    meter_no = _extract_meter_number(text)
+    if meter_no:
+        slots["meter_number"] = meter_no
 
     # Bill check before transfer (some bill keywords overlap with "pay")
     is_bill = (
@@ -189,12 +312,66 @@ def _ask_beneficiary(lang: Language) -> str:
     })
 
 
+def _ask_account_and_bank(lang: Language, ben_name: str) -> str:
+    return _r(lang, {
+        Language.HAUSA: f"Menene lambar asusun banki mai lamba 10 da sunan bankin {ben_name}?",
+        Language.IGBO: f"Kedu nomba akauntu onuogugu 10 na aha ulo aku {ben_name}?",
+        Language.YORUBA: f"Kini nomba akanti oni-nomba 10 ati oruko banki ti {ben_name}?",
+        Language.NIGERIAN_ENGLISH: f"What is {ben_name}'s 10-digit account number and bank name?"
+    })
+
+
+def _ask_amount_with_acct(lang: Language, ben_name: str, bank: str, acct: str) -> str:
+    return _r(lang, {
+        Language.HAUSA: f"Na gane, asusun {acct} a {bank}. Nawa kuke son tura wa {ben_name}?",
+        Language.IGBO: f"Aghotara m, akauntu {acct} na {bank}. Ego ole ka i choro iziga nye {ben_name}?",
+        Language.YORUBA: f"Mo gba, akanti {acct} ni {bank}. Elo ni e fe fi ranse si {ben_name}?",
+        Language.NIGERIAN_ENGLISH: f"Got it, account {acct} at {bank}. How much would you like to send to {ben_name}?"
+    })
+
+
 def _ask_amount(lang: Language, beneficiary: str) -> str:
     return _r(lang, {
         Language.HAUSA: f"Nawa kuke son tura wa {beneficiary}?",
         Language.IGBO: f"Ego ole ka i choro iziga nye {beneficiary}?",
         Language.YORUBA: f"Iye owo melo ni e fe fi ranse si {beneficiary}?",
         Language.NIGERIAN_ENGLISH: f"Got it! How much would you like to send to {beneficiary}?"
+    })
+
+
+def _ask_meter_number(lang: Language) -> str:
+    return _r(lang, {
+        Language.HAUSA: "To, bari mu biya kudin wutan lantarki. Don Allah fadi lambar mitarku mai lamba 11.",
+        Language.IGBO: "Ọ dị mma, ka anyị kwuo ụgwọ ọkụ eletrik gị. Biko gwa m nọmba mita gị nke nwere ọnụọgụ 11.",
+        Language.YORUBA: "O dara, ẹ jẹ ki a san owo ina mọnamọna yin. Ẹ jọwọ sọ nọmba mita oni-nọmba 11 yin.",
+        Language.NIGERIAN_ENGLISH: "Sure! Let's pay your electricity bill. Please tell me your 11-digit meter number."
+    })
+
+
+def _meter_verified_ask_amount(lang: Language, meter_no: str, customer_name: str = "Aminu Kano") -> str:
+    return _r(lang, {
+        Language.HAUSA: f"An tabbatar da lambar mita {meter_no} a karkashin Ikeja Electric ga {customer_name}. Nawa kuke son biya?",
+        Language.IGBO: f"A kwadoro nọmba mita {meter_no} n'okpuru Ikeja Electric maka {customer_name}. Ego ole ka ị chọrọ ịkwụ?",
+        Language.YORUBA: f"A ti fọwọsi nọmba mita {meter_no} labẹ Ikeja Electric fun {customer_name}. Elo ni ẹ fẹ san?",
+        Language.NIGERIAN_ENGLISH: f"Meter number {meter_no} verified under Ikeja Electric for {customer_name}. How much would you like to pay?"
+    })
+
+
+def _confirm_bill_prompt(lang: Language, amount_fmt: str, meter_no: str, biller_name: str = "Ikeja Electric") -> str:
+    return _r(lang, {
+        Language.HAUSA: f"An tabbatar da lambar sirri! Tabbatar da biyan Naira {amount_fmt} ga {biller_name} don mitar {meter_no}. In tura?",
+        Language.IGBO: f"A kwadoro nọmba nzuzo gị! Kwenye nkwụnye ụgwọ nke Naira {amount_fmt} na {biller_name} maka mita {meter_no}. M ga-aga n'ihu?",
+        Language.YORUBA: f"A ti fọwọsi nọmba asiri yin! Ṣe ẹ fẹ san Naira {amount_fmt} si {biller_name} fun mita {meter_no}? Ṣe kin tẹsiwaju?",
+        Language.NIGERIAN_ENGLISH: f"PIN verified! Confirm payment of {amount_fmt} Naira to {biller_name} for meter {meter_no}. Should I go ahead?"
+    })
+
+
+def _bill_success(lang: Language, amount_fmt: str, meter_no: str, token: str, biller_name: str = "Ikeja Electric") -> str:
+    return _r(lang, {
+        Language.HAUSA: f"Biyan kudin wutan NEPA Naira {amount_fmt} na mitar {meter_no} ya yi nasara! Lambar wutanku ita ce {token}. An aiko muku da sakon SMS.",
+        Language.IGBO: f"Ịkwụ ụgwọ ọkụ eletrik nke Naira {amount_fmt} maka mita {meter_no} gara nke ọma! Nọmba nchaji gị bụ {token}. Anyị eziterela gị ozi SMS.",
+        Language.YORUBA: f"Isanwo owo ina NEPA ti Naira {amount_fmt} fun mita {meter_no} ti jasi aṣeyọri! Nọmba ina yin ni {token}. A ti fi SMS ranṣẹ si yin.",
+        Language.NIGERIAN_ENGLISH: f"Your payment of {amount_fmt} Naira to {biller_name} for meter {meter_no} was successful! Your recharge token is {token}. An SMS receipt has been sent to your phone."
     })
 
 
@@ -341,23 +518,43 @@ async def _run_state_machine(
     # Rules:
     #   (a) Must find a 4-digit match or the whole text is just those digits
     #   (b) No strong intent keywords ("send", "transfer", "balance" etc.) present
-    #   (c) ≤3 non-digit words around the number (not a full sentence)
-    #   (d) Not in transfer amount-collection phase (we have beneficiary but no amount)
+    #   (c) <=3 non-digit words around the number (not a full sentence)
+    #   (d) Not during slot collection (collecting transfer amount, account, or meter/bill amount)
     digits_match = re.findall(r'\b\d{4}\b', text)
     _strong_intent = TRANSFER_KEYWORDS + BALANCE_KEYWORDS + BILL_KEYWORDS_EN + AIRTIME_KEYWORDS + HELP_KEYWORDS
     _has_intent_kw = any(w in text for w in _strong_intent)
     _non_digit_words = [w for w in re.sub(r'[\d,]', '', text).split() if w.strip()]
-    # Block PIN detection only when we're waiting for the amount in a transfer flow
+
+    # Block PIN detection during slot-collection turns
     _collecting_transfer_amount = (
         pending.get("pending_action_type") == "transfer"
-        and pending.get("beneficiary_name")   # have beneficiary already
-        and not pending.get("amount_kobo")    # still need amount
+        and pending.get("beneficiary_name")
+        and not pending.get("amount_kobo")
     )
+    _collecting_transfer_acct = (
+        pending.get("pending_action_type") == "transfer"
+        and pending.get("beneficiary_name")
+        and not pending.get("target_ben")
+        and not (pending.get("account_number") and pending.get("bank_name"))
+    )
+    _collecting_meter = (
+        pending.get("pending_action_type") == "bill"
+        and not pending.get("meter_no")
+    )
+    _collecting_bill_amount = (
+        pending.get("pending_action_type") == "bill"
+        and pending.get("meter_verified")
+        and not pending.get("amount_kobo")
+    )
+
     is_pin_input = (
         (bool(digits_match) or text.strip() in ["1234", "1 2 3 4"])
-        and not _has_intent_kw                # no "send", "transfer", "balance" etc
-        and len(_non_digit_words) <= 3        # mostly digits, not a full sentence
-        and not _collecting_transfer_amount   # not in amount-collection phase
+        and not _has_intent_kw
+        and len(_non_digit_words) <= 3
+        and not _collecting_transfer_amount
+        and not _collecting_transfer_acct
+        and not _collecting_meter
+        and not _collecting_bill_amount
     )
 
     if is_pin_input:
@@ -367,20 +564,32 @@ async def _run_state_machine(
             amount_kobo = pending.get("amount_kobo", 500_000)
             amount_naira = pending.get("amount_naira", "5,000")
             ben_name = pending.get("beneficiary_name", "Musa Bello")
-            target_ben = pending.get("target_ben", {
-                "name": "Musa Bello", "account_number": "2045678901", "bank_name": "First Bank"
-            })
+            target_ben = pending.get("target_ben") or {}
+            acct_no = target_ben.get("account_number") or pending.get("account_number", "2045678901")
+            bank_name = target_ben.get("bank_name") or pending.get("bank_name", "First Bank")
+
+            # Ensure beneficiary exists in DB before quoting
+            try:
+                bens_res = await tools.list_beneficiaries(account_id)
+                saved_bens = bens_res.get("beneficiaries", [])
+                match = next((b for b in saved_bens if b["account_number"] == acct_no), None)
+                if not match:
+                    await tools.add_beneficiary(account_id, ben_name, acct_no, bank_name)
+            except Exception as e:
+                logger.warning(f"Error auto-saving beneficiary: {e}")
+
             quote_res = await tools.quote_transfer(
                 source_account_id=account_id,
-                beneficiary_account_number=target_ben.get("account_number", "2045678901"),
-                beneficiary_bank_name=target_ben.get("bank_name", "First Bank"),
+                beneficiary_account_number=acct_no,
+                beneficiary_bank_name=bank_name,
                 amount_kobo=amount_kobo
             )
             tool_records.append(ToolCallRecord(tool="quote_transfer", arguments={"amount_kobo": amount_kobo}, result=quote_res))
             token = quote_res.get("confirmation_token")
             ben_quoted = quote_res.get("beneficiary_name", ben_name)
+            ben_display = f"{ben_quoted} at {bank_name} ({acct_no})" if bank_name and acct_no else ben_quoted
             return AgentRespondResponse(
-                reply_text=_confirm_transfer_prompt(lang, amount_naira, ben_quoted),
+                reply_text=_confirm_transfer_prompt(lang, amount_naira, ben_display),
                 intent="quote_transfer",
                 tool_calls=tool_records,
                 needs_confirmation=True,
@@ -388,6 +597,8 @@ async def _run_state_machine(
                     "action": "confirm_transfer",
                     "confirmation_token": token,
                     "beneficiary_name": ben_quoted,
+                    "bank_name": bank_name,
+                    "account_number": acct_no,
                     "amount_naira": amount_naira,
                     "amount_kobo": amount_kobo
                 }
@@ -410,23 +621,24 @@ async def _run_state_machine(
             )
 
         elif pending_type == "bill":
-            idem_key = f"idem_bill_{secrets.token_hex(6)}"
-            bill_res = await tools.pay_bill(
-                account_id=account_id, biller="bil_ikeja_electric",
-                meter_no="45129038101", amount_kobo=200_000,
-                idempotency_key=idem_key, session_id=req.session_id
-            )
-            tool_records.append(ToolCallRecord(tool="pay_bill", arguments={"biller": "bil_ikeja_electric", "amount_kobo": 200000}, result=bill_res))
-            bill_replies = {
-                Language.HAUSA: "An tabbatar da lambar sirri! An biya kudin wutan NEPA Naira 2,000 cikin nasara.",
-                Language.IGBO: "A kwadoro nomba nzuzo gi! A kwuola ugwo oku eletrik nke Naira puku abuo nke oma.",
-                Language.YORUBA: "A ti fowo si nomba asiri yin! A ti san owo ina NEPA ti egbaji Naira meji laseyori.",
-                Language.NIGERIAN_ENGLISH: "PIN verified! Your electricity bill of 2,000 Naira has been paid successfully."
-            }
+            meter_no = pending.get("meter_no", "45129038101")
+            amount_kobo = pending.get("amount_kobo", 200_000)
+            amount_naira = pending.get("amount_naira", "2,000")
+            biller_id = pending.get("biller_id", "bil_ikeja_electric")
+            biller_name = pending.get("biller_name", "Ikeja Electric")
+
             return AgentRespondResponse(
-                reply_text=_r(lang, bill_replies),
-                intent="pay_bill",
-                tool_calls=tool_records
+                reply_text=_confirm_bill_prompt(lang, amount_naira, meter_no, biller_name),
+                intent="quote_bill",
+                needs_confirmation=True,
+                next_state={
+                    "action": "confirm_bill",
+                    "biller_id": biller_id,
+                    "biller_name": biller_name,
+                    "meter_no": meter_no,
+                    "amount_kobo": amount_kobo,
+                    "amount_naira": amount_naira
+                }
             )
 
         # Generic PIN ok
@@ -438,7 +650,7 @@ async def _run_state_machine(
         }
         return AgentRespondResponse(reply_text=_r(lang, pin_ok), intent="pin_verified")
 
-    # ── STEP 3: Awaiting transfer confirmation ───────────────────────────────
+    # ── STEP 3: Awaiting confirmations (transfer or bill) ───────────────────
     if pending.get("action") == "confirm_transfer":
         token = pending.get("confirmation_token")
         beneficiary_name = pending.get("beneficiary_name", "the recipient")
@@ -509,26 +721,104 @@ async def _run_state_machine(
         })
         return AgentRespondResponse(reply_text=reask, intent="awaiting_confirmation", next_state=pending)
 
-    # ── STEP 4: Slot-filling for in-progress transfer ────────────────────────
+    if pending.get("action") == "confirm_bill":
+        meter_no = pending.get("meter_no", "45129038101")
+        amount_kobo = pending.get("amount_kobo", 200_000)
+        amount_naira = pending.get("amount_naira", "2,000")
+        biller_id = pending.get("biller_id", "bil_ikeja_electric")
+        biller_name = pending.get("biller_name", "Ikeja Electric")
+
+        if any(w in text for w in CONFIRMATION_KEYWORDS):
+            idem_key = f"idem_bill_{secrets.token_hex(6)}"
+            bill_res = await tools.pay_bill(
+                account_id=account_id, biller_id=biller_id,
+                customer_meter=meter_no, amount_kobo=amount_kobo,
+                idempotency_key=idem_key, session_id=req.session_id
+            )
+            tool_records.append(ToolCallRecord(tool="pay_bill", arguments={"biller": biller_id, "amount_kobo": amount_kobo}, result=bill_res))
+            t_parts = [str(secrets.randbelow(9000) + 1000) for _ in range(5)]
+            token = "-".join(t_parts)
+            sms_msg = f"Lyfpartner Bill Pay: NGN {amount_naira}.00 paid to {biller_name} for meter {meter_no}. Token: {token}."
+            sms_res = await tools.send_sms_receipt(caller_id, sms_msg)
+            tool_records.append(ToolCallRecord(tool="send_sms_receipt", arguments={"to": caller_id}, result=sms_res))
+            return AgentRespondResponse(
+                reply_text=_bill_success(lang, amount_naira, meter_no, token, biller_name),
+                intent="bill_completed",
+                tool_calls=tool_records,
+                next_state=None
+            )
+
+        if any(w in text for w in CANCEL_KEYWORDS):
+            return AgentRespondResponse(
+                reply_text=_cancel_reply(lang),
+                intent="bill_cancelled",
+                next_state=None
+            )
+
+        reask = _confirm_bill_prompt(lang, amount_naira, meter_no, biller_name)
+        return AgentRespondResponse(reply_text=reask, intent="awaiting_bill_confirmation", next_state=pending)
+
+    # ── STEP 4: Slot-filling for in-progress operations ─────────────────────
     if pending.get("pending_action_type") == "transfer":
         updated = dict(pending)
+        # 1. Update amount if provided
         if slots.get("amount") and not updated.get("amount_kobo"):
             updated["amount_kobo"] = slots["amount"] * 100
             updated["amount_naira"] = f"{slots['amount']:,}"
-        if slots.get("beneficiary") and not updated.get("beneficiary_name"):
+        elif not updated.get("amount_kobo"):
+            amt = _parse_amount(text)
+            if amt:
+                updated["amount_kobo"] = amt * 100
+                updated["amount_naira"] = f"{amt:,}"
+
+        # 2. Update beneficiary if not yet set
+        if not updated.get("beneficiary_name"):
+            if slots.get("beneficiary"):
+                updated["beneficiary_name"] = slots["beneficiary"]
+            else:
+                ben_cand = _extract_beneficiary_from_text(req.text)
+                if ben_cand:
+                    updated["beneficiary_name"] = ben_cand
+                elif len(req.text.split()) <= 3 and not _extract_account_number(req.text):
+                    cleaned_name = re.sub(r'[^A-Za-z\s]', '', req.text).strip().title()
+                    if cleaned_name and cleaned_name.lower() not in [b[0] for b in NIGERIAN_BANKS]:
+                        updated["beneficiary_name"] = cleaned_name
+
+        ben_name = updated.get("beneficiary_name")
+        target_ben = updated.get("target_ben")
+        if ben_name and not target_ben:
             try:
                 bens_res = await tools.list_beneficiaries(account_id)
                 bens = bens_res.get("beneficiaries", [])
-                match = _extract_beneficiary_name(req.text, bens)
+                match = _extract_beneficiary_name(ben_name, bens) or _extract_beneficiary_name(req.text, bens)
                 if match:
                     updated["beneficiary_name"] = match["name"]
                     updated["target_ben"] = match
-                else:
-                    updated["beneficiary_name"] = slots["beneficiary"]
+                    updated["account_number"] = match["account_number"]
+                    updated["bank_name"] = match["bank_name"]
+                    target_ben = match
             except Exception:
-                updated["beneficiary_name"] = slots["beneficiary"]
+                pass
+
+        acct_no = _extract_account_number(req.text) or slots.get("account_number")
+        bank_name = _extract_bank_name(req.text) or slots.get("bank_name")
+        if acct_no:
+            updated["account_number"] = acct_no
+        if bank_name:
+            updated["bank_name"] = bank_name
+
+        if not target_ben and updated.get("account_number") and updated.get("bank_name"):
+            acct = updated["account_number"]
+            bank = updated["bank_name"]
+            try:
+                await tools.add_beneficiary(account_id, ben_name or "Beneficiary", acct, bank)
+            except Exception as e:
+                logger.warning(f"Error auto-saving beneficiary: {e}")
+            target_ben = {"name": ben_name or "Beneficiary", "account_number": acct, "bank_name": bank}
+            updated["target_ben"] = target_ben
 
         has_beneficiary = bool(updated.get("beneficiary_name"))
+        has_acct_and_bank = bool(target_ben or (updated.get("account_number") and updated.get("bank_name")))
         has_amount = bool(updated.get("amount_kobo"))
 
         if not has_beneficiary:
@@ -537,21 +827,77 @@ async def _run_state_machine(
                 intent="slot_filling_beneficiary",
                 next_state=updated
             )
-        if not has_amount:
+
+        if not has_acct_and_bank:
             return AgentRespondResponse(
-                reply_text=_ask_amount(lang, updated["beneficiary_name"]),
+                reply_text=_ask_account_and_bank(lang, updated["beneficiary_name"]),
+                intent="slot_filling_account_bank",
+                next_state=updated
+            )
+
+        if not has_amount:
+            bank = target_ben.get("bank_name", updated.get("bank_name", "bank"))
+            acct = target_ben.get("account_number", updated.get("account_number", "account"))
+            return AgentRespondResponse(
+                reply_text=_ask_amount_with_acct(lang, updated["beneficiary_name"], bank, acct),
                 intent="slot_filling_amount",
                 next_state=updated
             )
 
-        # All slots filled → PIN
+        # All slots filled -> PIN
         amt_fmt = updated["amount_naira"]
         ben_name = updated["beneficiary_name"]
+        bank = target_ben.get("bank_name", updated.get("bank_name", ""))
+        acct = target_ben.get("account_number", updated.get("account_number", ""))
         summary = _r(lang, {
-            Language.HAUSA: f"Na fahimta, kuna son tura Naira {amt_fmt} ga {ben_name}.",
-            Language.IGBO: f"Aghọtara m, ị chọrọ iziga Naira {amt_fmt} nye {ben_name}.",
-            Language.YORUBA: f"Mo gbo, ẹ fẹ fi Naira {amt_fmt} ranṣẹ si {ben_name}.",
-            Language.NIGERIAN_ENGLISH: f"Alright! You want to send {amt_fmt} Naira to {ben_name}."
+            Language.HAUSA: f"Na fahimta, kuna son tura Naira {amt_fmt} ga {ben_name} a {bank}, asusu {acct}.",
+            Language.IGBO: f"Aghọtara m, ị chọrọ iziga Naira {amt_fmt} nye {ben_name} na {bank}, akaụntụ {acct}.",
+            Language.YORUBA: f"Mo gbọ, ẹ fẹ fi Naira {amt_fmt} ranṣẹ si {ben_name} ni {bank}, akọọlẹ {acct}.",
+            Language.NIGERIAN_ENGLISH: f"Alright! You want to send {amt_fmt} Naira to {ben_name} at {bank}, account {acct}."
+        })
+        return AgentRespondResponse(
+            reply_text=_ask_pin_privacy(lang, summary),
+            intent="pin_privacy_prompt",
+            next_state=updated
+        )
+
+    if pending.get("pending_action_type") == "bill":
+        updated = dict(pending)
+        meter_no = _extract_meter_number(req.text) or slots.get("meter_number")
+        if meter_no:
+            updated["meter_no"] = meter_no
+            updated["meter_verified"] = True
+            updated["biller_id"] = updated.get("biller_id", "bil_ikeja_electric")
+            updated["biller_name"] = updated.get("biller_name", "Ikeja Electric")
+
+        amt = _parse_amount(req.text) or slots.get("amount")
+        if amt:
+            updated["amount_kobo"] = amt * 100
+            updated["amount_naira"] = f"{amt:,}"
+
+        if not updated.get("meter_no"):
+            return AgentRespondResponse(
+                reply_text=_ask_meter_number(lang),
+                intent="slot_filling_meter",
+                next_state=updated
+            )
+
+        if not updated.get("amount_kobo"):
+            meter = updated["meter_no"]
+            return AgentRespondResponse(
+                reply_text=_meter_verified_ask_amount(lang, meter, "Aminu Kano"),
+                intent="meter_verified_ask_amount",
+                next_state=updated
+            )
+
+        amt_fmt = updated["amount_naira"]
+        meter = updated["meter_no"]
+        biller = updated.get("biller_name", "Ikeja Electric")
+        summary = _r(lang, {
+            Language.HAUSA: f"Kuna son biyan Naira {amt_fmt} don mitar {biller} {meter}.",
+            Language.IGBO: f"Ị chọrọ ịkwụ Naira {amt_fmt} maka mita {biller} {meter}.",
+            Language.YORUBA: f"Ẹ fẹ san Naira {amt_fmt} fun mita {biller} {meter}.",
+            Language.NIGERIAN_ENGLISH: f"You want to pay {amt_fmt} Naira for {biller} meter {meter}."
         })
         return AgentRespondResponse(
             reply_text=_ask_pin_privacy(lang, summary),
@@ -583,44 +929,68 @@ async def _run_state_machine(
         if not target_ben and slots.get("beneficiary"):
             target_ben = _extract_beneficiary_name(slots["beneficiary"], bens)
 
-        amount_naira = slots.get("amount")
+        ben_name = target_ben["name"] if target_ben else (slots.get("beneficiary") or _extract_beneficiary_from_text(req.text))
+        acct_no = _extract_account_number(req.text) or slots.get("account_number")
+        bank_name = _extract_bank_name(req.text) or slots.get("bank_name")
+
+        amount_naira = slots.get("amount") or _parse_amount(req.text)
         amount_kobo = amount_naira * 100 if amount_naira else None
 
         new_pending: Dict[str, Any] = {"pending_action_type": "transfer"}
+        if ben_name:
+            new_pending["beneficiary_name"] = ben_name
         if target_ben:
-            new_pending["beneficiary_name"] = target_ben["name"]
             new_pending["target_ben"] = target_ben
+            new_pending["account_number"] = target_ben["account_number"]
+            new_pending["bank_name"] = target_ben["bank_name"]
+        elif acct_no and bank_name:
+            new_pending["account_number"] = acct_no
+            new_pending["bank_name"] = bank_name
+            try:
+                await tools.add_beneficiary(account_id, ben_name or "Beneficiary", acct_no, bank_name)
+            except Exception as e:
+                logger.warning(f"Error auto-saving beneficiary: {e}")
+            target_ben = {"name": ben_name or "Beneficiary", "account_number": acct_no, "bank_name": bank_name}
+            new_pending["target_ben"] = target_ben
+
         if amount_kobo:
             new_pending["amount_kobo"] = amount_kobo
             new_pending["amount_naira"] = f"{amount_naira:,}"
 
-        if not target_ben:
+        if not ben_name:
             return AgentRespondResponse(
                 reply_text=_ask_beneficiary(lang),
                 intent="slot_filling_beneficiary",
                 next_state=new_pending
             )
-        if not amount_kobo:
+
+        if not target_ben:
             return AgentRespondResponse(
-                reply_text=_ask_amount(lang, target_ben["name"]),
+                reply_text=_ask_account_and_bank(lang, ben_name),
+                intent="slot_filling_account_bank",
+                next_state=new_pending
+            )
+
+        if not amount_kobo:
+            bank = target_ben.get("bank_name", "bank")
+            acct = target_ben.get("account_number", "account")
+            return AgentRespondResponse(
+                reply_text=_ask_amount_with_acct(lang, ben_name, bank, acct),
                 intent="slot_filling_amount",
                 next_state=new_pending
             )
 
         amt_fmt = f"{amount_naira:,}"
-        ben_name = target_ben["name"]
+        bank = target_ben.get("bank_name", "")
+        acct = target_ben.get("account_number", "")
         summary = _r(lang, {
-            Language.HAUSA: f"Na fahimta, kuna son tura Naira {amt_fmt} ga {ben_name}.",
-            Language.IGBO: f"Aghọtara m, ị chọrọ iziga Naira {amt_fmt} nye {ben_name}.",
-            Language.YORUBA: f"Mo gbo, ẹ fẹ fi Naira {amt_fmt} ranṣẹ si {ben_name}.",
-            Language.NIGERIAN_ENGLISH: f"Alright! You want to send {amt_fmt} Naira to {ben_name}."
+            Language.HAUSA: f"Na fahimta, kuna son tura Naira {amt_fmt} ga {ben_name} a {bank}, asusu {acct}.",
+            Language.IGBO: f"Aghọtara m, ị chọrọ iziga Naira {amt_fmt} nye {ben_name} na {bank}, akaụntụ {acct}.",
+            Language.YORUBA: f"Mo gbọ, ẹ fẹ fi Naira {amt_fmt} ranṣẹ si {ben_name} ni {bank}, akọọlẹ {acct}.",
+            Language.NIGERIAN_ENGLISH: f"Alright! You want to send {amt_fmt} Naira to {ben_name} at {bank}, account {acct}."
         })
 
         if auth == AuthLevel.NONE:
-            new_pending["amount_kobo"] = amount_kobo
-            new_pending["amount_naira"] = amt_fmt
-            new_pending["beneficiary_name"] = ben_name
-            new_pending["target_ben"] = target_ben
             return AgentRespondResponse(
                 reply_text=_ask_pin_privacy(lang, summary),
                 intent="pin_privacy_prompt",
@@ -637,8 +1007,9 @@ async def _run_state_machine(
         tool_records.append(ToolCallRecord(tool="quote_transfer", arguments={"amount_kobo": amount_kobo}, result=quote_res))
         token = quote_res.get("confirmation_token")
         ben_quoted = quote_res.get("beneficiary_name", ben_name)
+        ben_display = f"{ben_quoted} at {bank} ({acct})" if bank and acct else ben_quoted
         return AgentRespondResponse(
-            reply_text=_confirm_transfer_prompt(lang, amt_fmt, ben_quoted),
+            reply_text=_confirm_transfer_prompt(lang, amt_fmt, ben_display),
             intent="quote_transfer",
             tool_calls=tool_records,
             needs_confirmation=True,
@@ -646,6 +1017,8 @@ async def _run_state_machine(
                 "action": "confirm_transfer",
                 "confirmation_token": token,
                 "beneficiary_name": ben_quoted,
+                "bank_name": bank,
+                "account_number": acct,
                 "amount_naira": amt_fmt,
                 "amount_kobo": amount_kobo
             }
@@ -678,32 +1051,69 @@ async def _run_state_machine(
 
     # Bill
     if intent == "pay_bill":
+        meter_no = _extract_meter_number(req.text) or slots.get("meter_number")
+        amount_naira = slots.get("amount") or _parse_amount(req.text)
+        amount_kobo = amount_naira * 100 if amount_naira else None
+
+        new_pending: Dict[str, Any] = {
+            "pending_action_type": "bill",
+            "biller_id": "bil_ikeja_electric",
+            "biller_name": "Ikeja Electric"
+        }
+
+        if meter_no:
+            new_pending["meter_no"] = meter_no
+            new_pending["meter_verified"] = True
+
+        if amount_kobo:
+            new_pending["amount_kobo"] = amount_kobo
+            new_pending["amount_naira"] = f"{amount_naira:,}"
+
+        # If no meter number provided yet: ask for meter number
+        if not meter_no:
+            return AgentRespondResponse(
+                reply_text=_ask_meter_number(lang),
+                intent="pay_bill",
+                next_state=new_pending
+            )
+
+        # Meter provided, but no amount: verify meter and ask amount
+        if not amount_kobo:
+            return AgentRespondResponse(
+                reply_text=_meter_verified_ask_amount(lang, meter_no, "Aminu Kano"),
+                intent="meter_verified_ask_amount",
+                next_state=new_pending
+            )
+
+        # Both meter and amount provided
+        amt_fmt = f"{amount_naira:,}"
         if auth == AuthLevel.NONE:
             summary = _r(lang, {
-                Language.HAUSA: "Zan taimaka muku wajen biyan kudin wuta.",
-                Language.IGBO: "Ka anyi kwuo ugwo oku eletrik gi.",
-                Language.YORUBA: "E je ki a san owo ina yin.",
-                Language.NIGERIAN_ENGLISH: "Sure, let's pay your electricity bill."
+                Language.HAUSA: f"Kuna son biyan Naira {amt_fmt} don mitar Ikeja Electric {meter_no}.",
+                Language.IGBO: f"Ị chọrọ ịkwụ Naira {amt_fmt} maka mita Ikeja Electric {meter_no}.",
+                Language.YORUBA: f"Ẹ fẹ san Naira {amt_fmt} fun mita Ikeja Electric {meter_no}.",
+                Language.NIGERIAN_ENGLISH: f"You want to pay {amt_fmt} Naira for Ikeja Electric meter {meter_no}."
             })
             return AgentRespondResponse(
                 reply_text=_ask_pin_privacy(lang, summary),
                 intent="pin_privacy_prompt",
-                next_state={"pending_action_type": "bill"}
+                next_state=new_pending
             )
-        idem_key = f"idem_bill_{secrets.token_hex(6)}"
-        bill_res = await tools.pay_bill(
-            account_id=account_id, biller_id="bil_ikeja_electric",
-            customer_meter="45129038101", amount_kobo=200_000,
-            idempotency_key=idem_key, session_id=req.session_id
+
+        # Authenticated: go straight to confirmation
+        return AgentRespondResponse(
+            reply_text=_confirm_bill_prompt(lang, amt_fmt, meter_no, "Ikeja Electric"),
+            intent="quote_bill",
+            needs_confirmation=True,
+            next_state={
+                "action": "confirm_bill",
+                "biller_id": "bil_ikeja_electric",
+                "biller_name": "Ikeja Electric",
+                "meter_no": meter_no,
+                "amount_kobo": amount_kobo,
+                "amount_naira": amt_fmt
+            }
         )
-        tool_records.append(ToolCallRecord(tool="pay_bill", arguments={"biller": "bil_ikeja_electric"}, result=bill_res))
-        bill_replies = {
-            Language.HAUSA: "An biya kudin wutan NEPA Naira 2,000 cikin nasara.",
-            Language.IGBO: "A kwuola ugwo oku eletrik nke Naira puku abuo nke oma.",
-            Language.YORUBA: "A ti san owo ina NEPA ti egbaji Naira meji laseyori.",
-            Language.NIGERIAN_ENGLISH: "Your electricity bill payment of 2,000 Naira has been paid successfully."
-        }
-        return AgentRespondResponse(reply_text=_r(lang, bill_replies), intent="pay_bill", tool_calls=tool_records)
 
     # Airtime
     if intent == "airtime":
@@ -776,18 +1186,27 @@ Caller language: {lang_name}. {pending_ctx}
 Extract the caller's intent. Return ONLY valid JSON with this exact shape:
 {{
   "intent": "<one of: greeting | check_balance | transfer | pay_bill | airtime | help | confirm_yes | confirm_no | cancel | repeat_last | unknown>",
-  "slots": {{"amount": <Naira number or null>, "beneficiary": "<name or null>", "bill_type": "<electricity|water|cable or null>"}},
+  "slots": {{
+    "amount": <Naira number or null>,
+    "beneficiary": "<name or null>",
+    "account_number": "<10-digit number or null>",
+    "bank_name": "<bank name or null>",
+    "meter_number": "<meter number or null>",
+    "bill_type": "<electricity|water|cable or null>"
+  }},
   "reply_hint": ""
 }}
 
 Rules:
-- "hello I want to make a transfer" / "I want to transfer" / "tura kudi" / "fi owo ranse" → intent=transfer
-- "send 5k to Musa" → intent=transfer, slots.amount=5000, slots.beneficiary="Musa"
-- "what is my balance" / "duba kudi na" / "how much i get" → intent=check_balance
-- "pay NEPA" / "san owo ina" / "kudin wuta" / "electricity" → intent=pay_bill
-- "yes" / "proceed" / "ehen" / "beeni" / "o ya" / "oya" → intent=confirm_yes
-- "no" / "cancel" / "mba" / "a'a" → intent=cancel
-- NEVER default to check_balance when unsure. If unclear → intent=unknown
+- "hello I want to make a transfer" / "transfer to Ibrahim" / "transfer ti ibrahim" / "tura kudi" / "fi owo ranse" -> intent=transfer
+- "send 5k to Musa" -> intent=transfer, slots.amount=5000, slots.beneficiary="Musa"
+- "0123456789 GTBank" -> slots.account_number="0123456789", slots.bank_name="GTBank"
+- "what is my balance" / "duba kudi na" / "how much i get" -> intent=check_balance
+- "pay NEPA" / "pay electricity" / "san owo ina" / "kudin wuta" / "electricity" -> intent=pay_bill, slots.bill_type="electricity"
+- "meter 45129038101" / "45129038101" -> slots.meter_number="45129038101"
+- "yes" / "proceed" / "ehen" / "beeni" / "o ya" / "oya" -> intent=confirm_yes
+- "no" / "cancel" / "mba" / "a'a" -> intent=cancel
+- NEVER default to check_balance when unsure. If unclear -> intent=unknown
 Return ONLY JSON. No other text."""
 
         messages = [{"role": "system", "content": system_prompt}]
@@ -832,7 +1251,9 @@ Return ONLY JSON. No other text."""
         DETERMINISTIC_INTENTS = {
             "pin_privacy_prompt", "quote_transfer", "transfer_completed", "transfer_cancelled",
             "check_balance", "pay_bill", "buy_airtime", "escalate_to_human",
-            "slot_filling_beneficiary", "slot_filling_amount", "low_confidence_reprompt",
+            "slot_filling_beneficiary", "slot_filling_amount", "slot_filling_account_bank",
+            "slot_filling_meter", "meter_verified_ask_amount", "quote_bill", "bill_completed",
+            "bill_cancelled", "awaiting_bill_confirmation", "low_confidence_reprompt",
             "awaiting_confirmation", "mid_flow_correction", "digression_balance"
         }
         if intent in DETERMINISTIC_INTENTS or not self.api_key:

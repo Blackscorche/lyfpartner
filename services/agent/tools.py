@@ -51,6 +51,23 @@ class ToolRegistry:
                 logger.warning(f"Error listing beneficiaries: {e}")
                 return {"beneficiaries": []}
 
+    async def add_beneficiary(self, account_id: str, name: str, account_number: str, bank_name: str, nickname: Optional[str] = None) -> Dict[str, Any]:
+        """Add a new beneficiary to customer account."""
+        async with async_session_maker() as session:
+            try:
+                ben = await self.bank_provider.add_beneficiary(
+                    session=session,
+                    account_id=account_id,
+                    name=name,
+                    account_number=account_number,
+                    bank_name=bank_name,
+                    nickname=nickname
+                )
+                return ben.model_dump()
+            except Exception as e:
+                logger.warning(f"Error adding beneficiary: {e}")
+                return {"error": str(e)}
+
     async def quote_transfer(self, source_account_id: str, beneficiary_account_number: str, beneficiary_bank_name: str, amount_kobo: int) -> Dict[str, Any]:
         """Initiate transfer quote and retrieve 120s confirmation token."""
         async with async_session_maker() as session:

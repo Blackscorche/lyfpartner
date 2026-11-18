@@ -54,7 +54,7 @@ async def test_intent_transfer_no_slots_asks_beneficiary():
         # State must track transfer intent
         assert data["pending_action"] is not None
         assert data["pending_action"].get("pending_action_type") == "transfer"
-        assert data["intent"] in ("slot_filling_beneficiary", "transfer", "pin_privacy_prompt")
+        assert data["intent"] in ("slot_filling_beneficiary", "transfer", "pin_privacy_prompt", "slot_filling_account_bank")
 
 
 @pytest.mark.asyncio
@@ -111,10 +111,10 @@ async def test_multiturn_transfer_slot_filling():
         pa1 = t1.get("pending_action") or {}
         assert pa1.get("pending_action_type") == "transfer", \
             f"Should set transfer pending. Got pending: {pa1}, intent: {t1['intent']}"
-        assert t1["intent"] in ("slot_filling_beneficiary", "transfer"), \
+        assert t1["intent"] in ("slot_filling_beneficiary", "transfer", "slot_filling_account_bank"), \
             f"Should be in slot-filling. Got: {t1['intent']}"
         reply1 = t1["reply_text"].lower()
-        assert any(w in reply1 for w in ["who", "whom", "send to", "beneficiary"]), \
+        assert any(w in reply1 for w in ["who", "whom", "send to", "beneficiary", "account", "10-digit"]), \
             f"Should ask beneficiary. Got: {t1['reply_text']}"
 
         # Turn 2: provide beneficiary
@@ -280,7 +280,7 @@ async def test_oya_transfer_intent():
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         sid = await _create_session(client)
         data = await _turn(client, sid, "oya transfer")
-        assert data["intent"] in ("slot_filling_beneficiary", "pin_privacy_prompt", "transfer"), \
+        assert data["intent"] in ("slot_filling_beneficiary", "pin_privacy_prompt", "transfer", "slot_filling_account_bank"), \
             f"'oya transfer' should be transfer intent, got: {data['intent']}"
         assert "250,000" not in data["reply_text"], "Should not read balance for transfer"
 
@@ -292,7 +292,7 @@ async def test_wanna_send_money():
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         sid = await _create_session(client)
         data = await _turn(client, sid, "I wanna send money")
-        assert data["intent"] in ("slot_filling_beneficiary", "pin_privacy_prompt", "transfer"), \
+        assert data["intent"] in ("slot_filling_beneficiary", "pin_privacy_prompt", "transfer", "slot_filling_account_bank"), \
             f"'wanna send money' should be transfer, got: {data['intent']}"
 
 
